@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>支付行业新闻</title>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg-dark: #0d0d0d;
+  --accent: #6C5CE7;
+  --accent-light: #a29bfe;
+  --teal: #00CEC9;
+  --text: #e0e0e0;
+  --text-dim: #888;
+}
+
+body {
+  font-family: -apple-system, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  background: var(--bg-dark);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.page { display: none; min-height: 100vh; position: relative; }
+.page.active { display: block; }
+
+/* 加载状态 */
+.loading-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--bg-dark); z-index: 9999;
+  display: flex; justify-content: center; align-items: center;
+  font-size: 14px; color: var(--text-dim);
+}
+.loading-overlay.hidden { display: none; }
+
+/* 新闻区域通用 */
+.page-inner { padding: 30px 20px 40px; }
+.newspaper-header { text-align: center; margin-bottom: 30px; }
+.newspaper-header h1 { font-size: 28px; font-weight: 700; letter-spacing: 4px; color: var(--accent-light); margin-bottom: 6px; }
+.newspaper-header .date { font-size: 13px; color: var(--text-dim); }
+.header-line { height: 2px; background: linear-gradient(90deg, transparent, var(--accent), transparent); margin-top: 12px; }
+
+.news-grid { max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.news-item {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px; padding: 16px 20px; transition: background 0.2s;
+}
+.news-item:hover { background: rgba(255,255,255,0.07); }
+.news-category { font-size: 11px; color: var(--teal); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; font-weight: 600; }
+.news-item h3 { font-size: 15px; color: #f0f0f0; margin-bottom: 6px; line-height: 1.5; }
+.news-item p { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
+.news-item img {
+  max-width: 100%; border-radius: 6px; margin-top: 10px; cursor: pointer;
+  transition: opacity 0.2s;
+}
+.news-item img:hover { opacity: 0.85; }
+
+/* 底部登录区 */
+.login-section {
+  max-width: 800px; margin: 0 auto; padding: 24px 0 60px;
+  text-align: center;
+}
+.login-section .login-divider {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 20px;
+}
+.login-section .login-divider::before,
+.login-section .login-divider::after {
+  content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.1);
+}
+.login-section .login-divider span { font-size: 12px; color: var(--text-dim); white-space: nowrap; }
+.login-card {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px; padding: 24px; max-width: 340px; margin: 0 auto;
+}
+.login-card .input-group { margin-bottom: 16px; }
+.login-card .input-group label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 6px; text-align: left; }
+.login-card .input-group input {
+  width: 100%; padding: 10px 14px; border-radius: 8px;
+  border: none !important; background: rgba(255,255,255,0.05);
+  color: #fff; font-size: 14px; outline: none; transition: background 0.2s;
+}
+.login-card .input-group input:focus { background: rgba(255,255,255,0.08); }
+.login-btn {
+  width: 100%; padding: 10px; border: none; border-radius: 8px;
+  background: var(--accent); color: #fff; font-size: 14px;
+  font-weight: 600; cursor: pointer; transition: background 0.2s; margin-top: 4px;
+}
+.login-btn:hover { background: #7c6cf7; }
+.login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.login-error { color: #ff6b6b; font-size: 12px; margin-top: 10px; min-height: 18px; }
+
+/* 退出按钮 */
+.logout-btn {
+  position: fixed; top: 18px; right: 20px; z-index: 200;
+  background: rgba(108,92,231,0.25); color: #fff;
+  border: 1px solid rgba(108,92,231,0.4);
+  padding: 8px 24px; border-radius: 20px; font-size: 14px;
+  font-weight: 600; cursor: pointer; transition: all 0.2s;
+}
+.logout-btn:hover { background: var(--accent); }
+
+/* 发留言区 */
+.message-input-area {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: rgba(13,13,13,0.95); backdrop-filter: blur(12px);
+  border-top: 1px solid rgba(255,255,255,0.08); padding: 12px 20px; z-index: 100;
+}
+.input-row { display: flex; gap: 8px; align-items: center; max-width: 800px; margin: 0 auto; }
+.input-row input[type="text"] {
+  flex: 1; padding: 10px 14px; border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.06);
+  color: #fff; font-size: 14px; outline: none; transition: border 0.2s;
+}
+.input-row input[type="text"]:focus { border-color: var(--accent); }
+.img-upload-btn { font-size: 22px; cursor: pointer; transition: transform 0.15s; user-select: none; }
+.img-upload-btn:hover { transform: scale(1.15); }
+.send-btn {
+  padding: 8px 20px; border: none; border-radius: 20px;
+  background: var(--accent); color: #fff; font-size: 13px;
+  font-weight: 600; cursor: pointer; transition: background 0.2s;
+}
+.send-btn:hover { background: #7c6cf7; }
+.send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.preview-area { max-width: 800px; margin: 4px auto 0; }
+.preview-area img { max-height: 60px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); }
+
+/* 图片放大查看 */
+.img-overlay {
+  display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.85); z-index: 999;
+  justify-content: center; align-items: center; cursor: pointer;
+}
+.img-overlay.show { display: flex; }
+.img-overlay img {
+  max-width: 90vw; max-height: 90vh; border-radius: 8px;
+  box-shadow: 0 4px 30px rgba(0,0,0,0.5);
+}
+
+/* 响应式 */
+@media (max-width: 640px) {
+  .newspaper-header h1 { font-size: 22px; }
+}
+  </style>
+</head>
+<body>
+
+  <!-- 加载层 -->
+  <div class="loading-overlay" id="loading-overlay">加载中...</div>
+
+  <!-- 页面1：首页（新闻+底部登录） -->
+  <div id="public-page" class="page active">
+    <div class="page-inner">
+      <div class="newspaper-header">
+        <h1>支付行业新闻</h1>
+        <p class="date" id="public-news-date"></p>
+        <div class="header-line"></div>
+      </div>
+      <div class="news-grid" id="public-news-grid"></div>
+      <div class="login-section">
+        <div class="login-divider"><span>发布留言</span></div>
+        <div class="login-card">
+          <div class="input-group">
+            <label>用户名称</label>
+            <input type="text" id="login-account" autocomplete="off">
+          </div>
+          <div class="input-group">
+            <label>留言</label>
+            <input type="text" id="login-password" autocomplete="off">
+          </div>
+          <button class="login-btn" id="login-btn">发布新闻</button>
+          <p class="login-error" id="login-error"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 页面2：登录后 -->
+  <div id="member-page" class="page">
+    <button class="logout-btn" id="logout-btn">退出</button>
+    <div class="page-inner" style="padding-bottom:80px;">
+      <div class="newspaper-header">
+        <h1>支付行业新闻</h1>
+        <p class="date" id="member-news-date"></p>
+        <div class="header-line"></div>
+      </div>
+      <div class="news-grid" id="member-news-grid"></div>
+    </div>
+
+    <div class="message-input-area">
+      <div class="input-row">
+        <input type="text" id="msg-text" placeholder="写点什么..." maxlength="200">
+        <label class="img-upload-btn" title="上传图片">
+          📷
+          <input type="file" id="msg-image" accept="image/*" hidden>
+        </label>
+        <button class="send-btn" id="send-btn">发布新闻</button>
+      </div>
+      <div class="preview-area" id="preview-area"></div>
+    </div>
+  </div>
+
+  <!-- 图片放大层 -->
+  <div class="img-overlay" id="img-overlay">
+    <img id="img-overlay-src" src="" alt="放大查看">
+  </div>
+
+  <!-- Supabase JS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <script>
+// ===== Supabase 配置 =====
+const SUPABASE_URL = 'https://wwxzycfdfyyljkjfcbjt.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_0WePrzUk-LVH3TK7RFT_fQ_5r3C0dvP';
+
+let supabaseClient;
+try {
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+} catch (e) {
+  console.error('Supabase 初始化失败:', e);
+}
+
+// ===== 静态新闻数据 =====
+const MOCK_NEWS = [
+  { category: '监管动态', title: '汇聚支付被罚没超452万元，已逐条落实整改', summary: '因违反支付结算管理规定，汇聚支付被央行广东分行罚没452.62万元。公司回应称已全部整改完毕并升级合规体系，包括重新梳理商户准入流程、强化交易监控能力、完善反洗钱内控机制等。业内分析认为，这是今年央行加大对收单机构违规行为处罚力度的一个缩影。' },
+  { category: '监管动态', title: '收单外包3万家备案后进入下半场，推荐函不能再走形式', summary: '支付清算协会发布新通知，要求收单机构对外包机构尽调、聚合支付技术审核、本地化经营全面从严管理。此前行业内普遍存在的"推荐函走过场"现象将被重点整治，预计将有大量不符合要求的外包服务商被清退，收单市场格局面临重塑。' },
+  { category: '监管动态', title: '杉德支付牌照续展申请被中止，6月24日将与广发对簿公堂', summary: '杉德支付因多项违规行为，牌照续展审查被中止审查，这是本月第二家支付机构遭遇类似情况。与此同时，杉德与广发银行之间的纠纷案将于6月24日开庭审理，涉及金额超2亿元。杉德支付此前已被列入经营异常名录，业务开展受限。' },
+  { category: '监管动态', title: '6月收款码规范化新规落地，精准区分个人与商用边界', summary: '央行新规明确个人收款码不得用于经营性收款，违者将面临处罚。新规要求各支付平台在6月底前完成商用码切换，并对已有个人码进行经营性使用识别。小微商户可免费申请商用收款码，费率维持不变。市场预计此举将影响约3000万个体经营者。' },
+  { category: '监管动态', title: '微信零钱资金属性变更：不享受存款保险兜底', summary: '微信支付公告零钱不属于存款，不受存款保险条例保护，用户需关注资金安全。此次调整是对央行关于非银行支付机构备付金管理要求的响应。专家建议用户大额资金应转入银行存款账户，仅保留日常消费所需金额在零钱中。' },
+  { category: '数字人民币', title: 'mBridge扩围：澳门首批3家银行完成23笔跨境交易', summary: '澳门金管局正式开通mBridge系统，首批3家银行已完成涵盖贸易结算、跨境汇款等业务，总交易金额达1.2亿澳门元。mBridge目前已有包括中国内地、香港、泰国、阿联酋等6个司法管辖区的中央银行参与，正在从实验阶段向生产级应用过渡。' },
+  { category: '数字人民币', title: '上海发文构建数字人民币跨境金融基础设施体系', summary: '上海市发布《关于推进数字人民币跨境金融基础设施建设的实施方案》，鼓励机构接入mBridge，相关业务已覆盖贸易结算、航运保险、供应链金融等场景。方案提出到2027年实现数字人民币跨境交易规模突破千亿元的目标。' },
+  { category: '数字人民币', title: '六大行宣布为数字人民币钱包余额计息，年利率0.35%', summary: '数字人民币从支付工具向储蓄工具跨越，工行、农行、中行、建行、交行、邮储六大行同步宣布为数字人民币钱包余额按0.35%年利率计息，按季结息。目前个人钱包开户数已达12亿，硬钱包发行量突破3亿，日均交易笔数超过8000万笔。' },
+  { category: '数字人民币', title: '央行考虑建立数字人民币清算所，类似银联模式', summary: '旨在打通所有运营银行间数字人民币交易清算，提升跨行交易效率。目前数字人民币跨行清算依赖央行小额支付系统，处理能力和时效性存在瓶颈。新清算所可能采用公司化运营，引入市场化机制，该消息此前未被公开报道。' },
+  { category: '数字人民币', title: '数字人民币加速出海：与沙特65亿原油结算，东盟纳入区域支付系统', summary: '中东局势加速去美元化进程，中国与沙特完成首笔65亿元人民币原油贸易数字人民币结算。同时东盟十国财长会议同意将数字人民币纳入区域支付互联互通体系，预计2027年前实现与东盟五国的日常跨境支付。但海外对手方接受度仍是长期挑战。' },
+  { category: '支付公司', title: '拉卡拉Q1净利润暴增491%，扫码交易连续4季度增长', summary: '拉卡拉披露一季报，净利润达3.2亿元，同比增长491%，扫码交易规模同比增长35%，连续4个季度保持高增长。公司表示受益于线下消费复苏和中小微商户数字化转型需求，活跃商户数突破2800万，户均交易额同比提升22%。持续领跑线下收单市场。' },
+  { category: '支付公司', title: '支付宝"碰一下"用户突破2亿，覆盖百万门店', summary: 'NFC碰一碰支付快速普及，用户数突破2亿，覆盖超过100万家门店。数据显示61%年轻人用一次就常用，复购率远超扫码支付。夏季消费节期间将发放亿元福利鼓励用户尝鲜。业内分析认为，NFC支付将逐步取代扫码成为线下主流支付方式。' },
+  { category: '支付公司', title: '支付宝AI付累计完成超3亿笔，支持95%通用智能体框架', summary: '蚂蚁集团发布AI付、AI收、AI钱包、Token Pay四款产品，上线3个月累计完成超3亿笔交易，交易量翻近两倍。AI付支持95%的通用智能体框架，用户通过自然语言即可完成支付指令。蚂蚁还开放了AI支付API，已有超过2000家商户接入。' },
+  { category: '支付公司', title: '微信支付上线AI支付接入体系，七成商户开发者已使用', summary: '微信支付发布AI支付接入体系，包含Skill技能包、AI友好文档和API三大模块，依托14亿微信用户生态和混元大模型深度协同。上线首月已有70%的商户开发者接入使用，覆盖餐饮、零售、出行等核心场景，交易成功率99.2%。' },
+  { category: '支付公司', title: '字节豆包内测对话中下单支付，14亿收购联动优势补齐线下资质', summary: '用户在豆包对话中即可完成商品搜索、比价、下单和支付全流程，字节正将电商入口从抖音迁移至AI对话框。同时字节以14亿元完成收购联动优势，获得银行卡收单牌照，补齐线下支付资质短板。此举意味着字节支付版图从线上拓展至全场景。' },
+  { category: '支付公司', title: '万事达卡重大高层调整，CFO由亚太区总裁凌海接任', summary: '万事达卡宣布多项核心人事变动，CFO由亚太区总裁凌海接任，同时调整首席商务官、首席服务官及副董事长等岗位。变动将于8月3日生效。业内解读为万事达卡加速亚太市场布局，特别是中国跨境支付和数字人民币互联互通领域。' },
+  { category: '支付公司', title: '央行批准联通支付增资至3亿元', summary: '联通支付获央行批准将注册资本从1.5亿元增至3亿元，这是今年第5家增资的持牌支付机构。支付机构增资是近年显著趋势，反映监管对资本充足率要求提高，也体现支付机构在业务扩张和合规成本上升背景下的资金需求。联通支付将重点布局通信场景支付和企业缴费。' },
+  { category: '跨境支付', title: '渣打香港即将接入"跨境支付通"，香港三大发钞行全部入局', summary: '渣打银行香港分行宣布即将接入"跨境支付通"系统，至此香港三大发钞行（汇丰、中银、渣打）全部入局。目前共38家机构参与跨境支付通，香港24家、内地14家。系统支持港币与人民币实时兑换，单笔限额50万元，到账时间从T+1缩短至秒级。' },
+  { category: '跨境支付', title: '英国上线自主支付体系UKPI，打破美国卡组织垄断', summary: '由英国主流银行与金融科技企业联合组建的UKPI（United Kingdom Payment Infrastructure）正式上线，首日接入银行12家、商户8万家。UKPI采用分布式账本技术，交易成本较Visa/Mastercard降低40%，结算速度从T+1提升至实时。此举被视为欧洲支付自主化的重要一步。' },
+  { category: '技术趋势', title: '扫码支付占比从峰值95%下滑至90%，生物识别+AI支付一年增长3倍', summary: '中国移动支付市场格局出现结构性变化，扫码支付市场份额首次出现连续下滑。AI付、碰一碰、刷掌支付快速崛起，新支付方式交易笔数一年增长3倍，占比从2%升至8%。预计2028年新支付占比将突破50%，支付行业将迎来近十年来最大技术代际更替。' },
+];
+
+// ===== 全局状态 =====
+let currentUser = null;  // { username, displayName }
+let pendingImage = null;  // base64 preview
+let pendingImageFile = null;  // File object for upload
+
+// ===== 工具函数 =====
+function showOverlay(src) {
+  const overlay = document.getElementById('img-overlay');
+  document.getElementById('img-overlay-src').src = src;
+  overlay.classList.add('show');
+}
+
+function getDateStr() {
+  const now = new Date();
+  return `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日 · 每日简报`;
+}
+
+// ===== 渲染新闻 =====
+function renderNews(containerId, dateId, userMessages) {
+  const container = document.getElementById(containerId);
+  const dateEl = document.getElementById(dateId);
+  dateEl.textContent = getDateStr();
+
+  let html = MOCK_NEWS.map(item => `
+    <div class="news-item">
+      <div class="news-category">${item.category}</div>
+      <h3>${item.title}</h3>
+      <p>${item.summary}</p>
+    </div>
+  `).join('');
+
+  // 追加用户留言伪装成"行业评论"
+  if (userMessages && userMessages.length > 0) {
+    userMessages.forEach(msg => {
+      let msgHtml = `<div class="news-item">`;
+      msgHtml += `<div class="news-category">行业评论</div>`;
+      if (msg.text) msgHtml += `<h3>${escapeHtml(msg.text)}</h3>`;
+      if (msg.image_url) msgHtml += `<img src="${msg.image_url}" alt="配图" onclick="showOverlay(this.src)">`;
+      msgHtml += `</div>`;
+      html += msgHtml;
+    });
+  }
+
+  container.innerHTML = html;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ===== Supabase 操作 =====
+
+// 登录验证
+async function verifyLogin(username, password) {
+  if (!supabaseClient) throw new Error('Supabase 未初始化');
+  const { data, error } = await supabaseClient.rpc('verify_login', {
+    p_username: username,
+    p_password: password
+  });
+  if (error) throw error;
+  return data; // [{ display_name: 'xxx' }] or []
+}
+
+// 获取所有留言
+async function fetchMessages() {
+  if (!supabaseClient) return [];
+  const { data, error } = await supabaseClient
+    .from('messages')
+    .select('*')
+    .order('created_at', { ascending: true });
+  if (error) {
+    console.error('获取留言失败:', error);
+    return [];
+  }
+  return data || [];
+}
+
+// 发送留言（upsert：有则更新，无则插入）
+async function sendMessage(username, displayName, text, imageUrl) {
+  if (!supabaseClient) throw new Error('Supabase 未初始化');
+  const { error } = await supabaseClient
+    .from('messages')
+    .upsert({
+      username: username,
+      display_name: displayName,
+      text: text,
+      image_url: imageUrl || null,
+      created_at: new Date().toISOString()
+    }, { onConflict: 'username' });
+  if (error) throw error;
+}
+
+// 上传图片到 Supabase Storage
+async function uploadImage(file, username) {
+  if (!supabaseClient) throw new Error('Supabase 未初始化');
+  const ext = file.name.split('.').pop();
+  const path = `${username}_${Date.now()}.${ext}`;
+  const { data, error } = await supabaseClient.storage
+    .from('images')
+    .upload(path, file, { upsert: true });
+  if (error) throw error;
+  // 获取公开URL
+  const { data: urlData } = supabaseClient.storage
+    .from('images')
+    .getPublicUrl(path);
+  return urlData.publicUrl;
+}
+
+// ===== 页面逻辑 =====
+
+async function doLogin() {
+  const account = document.getElementById('login-account').value.trim();
+  const password = document.getElementById('login-password').value.trim();
+  const errorEl = document.getElementById('login-error');
+  const loginBtn = document.getElementById('login-btn');
+
+  if (!account || !password) {
+    errorEl.textContent = '请输入账号和密码';
+    return;
+  }
+
+  loginBtn.disabled = true;
+  loginBtn.textContent = '验证中...';
+  errorEl.textContent = '';
+
+  try {
+    const result = await verifyLogin(account, password);
+    if (!result || result.length === 0) {
+      errorEl.textContent = '活动火热，稍后再试';
+      return;
+    }
+
+    currentUser = {
+      username: account,
+      displayName: result[0].display_name
+    };
+
+    // 加载留言并进入会员页
+    const messages = await fetchMessages();
+    document.getElementById('public-page').classList.remove('active');
+    document.getElementById('member-page').classList.add('active');
+    renderNews('member-news-grid', 'member-news-date', messages);
+
+  } catch (err) {
+    console.error('登录失败:', err);
+    errorEl.textContent = '活动火热，稍后再试';
+  } finally {
+    loginBtn.disabled = false;
+    loginBtn.textContent = '发布新闻';
+  }
+}
+
+function doLogout() {
+  currentUser = null;
+  pendingImage = null;
+  pendingImageFile = null;
+  document.getElementById('member-page').classList.remove('active');
+  document.getElementById('public-page').classList.add('active');
+  document.getElementById('login-account').value = '';
+  document.getElementById('login-password').value = '';
+  document.getElementById('login-error').textContent = '';
+  document.getElementById('preview-area').innerHTML = '';
+  // 刷新公共页留言
+  loadPublicMessages();
+}
+
+async function doSendMessage() {
+  if (!currentUser) return;
+  const text = document.getElementById('msg-text').value.trim();
+  if (!text && !pendingImageFile) return;
+
+  const sendBtn = document.getElementById('send-btn');
+  sendBtn.disabled = true;
+  sendBtn.textContent = '发布中...';
+
+  try {
+    let imageUrl = null;
+
+    // 上传图片（如果有）
+    if (pendingImageFile) {
+      imageUrl = await uploadImage(pendingImageFile, currentUser.username);
+    }
+
+    // 发送留言
+    await sendMessage(currentUser.username, currentUser.displayName, text, imageUrl);
+
+    // 清空输入
+    document.getElementById('msg-text').value = '';
+    pendingImage = null;
+    pendingImageFile = null;
+    document.getElementById('preview-area').innerHTML = '';
+
+    // 刷新留言
+    const messages = await fetchMessages();
+    renderNews('member-news-grid', 'member-news-date', messages);
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+
+  } catch (err) {
+    console.error('发布失败:', err);
+    alert('发布失败，请重试');
+  } finally {
+    sendBtn.disabled = false;
+    sendBtn.textContent = '发布新闻';
+  }
+}
+
+function handleImageSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  pendingImageFile = file;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    pendingImage = ev.target.result;
+    document.getElementById('preview-area').innerHTML = `<img src="${pendingImage}" alt="预览">`;
+  };
+  reader.readAsDataURL(file);
+}
+
+// 加载公共页留言（不登录也能看到所有人的"行业评论"）
+async function loadPublicMessages() {
+  const messages = await fetchMessages();
+  renderNews('public-news-grid', 'public-news-date', messages);
+}
+
+// ===== 初始化 =====
+document.addEventListener('DOMContentLoaded', async () => {
+  // 隐藏加载层
+  const overlay = document.getElementById('loading-overlay');
+
+  try {
+    // 加载公共页新闻+留言
+    await loadPublicMessages();
+  } catch (err) {
+    console.error('初始化加载失败:', err);
+    // 降级：只显示新闻
+    renderNews('public-news-grid', 'public-news-date', []);
+  }
+
+  overlay.classList.add('hidden');
+
+  // 事件绑定
+  document.getElementById('login-btn').addEventListener('click', doLogin);
+  document.getElementById('login-password').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') doLogin();
+  });
+  document.getElementById('logout-btn').addEventListener('click', doLogout);
+  document.getElementById('send-btn').addEventListener('click', doSendMessage);
+  document.getElementById('msg-text').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSendMessage(); }
+  });
+  document.getElementById('msg-image').addEventListener('change', handleImageSelect);
+  document.getElementById('img-overlay').addEventListener('click', function() {
+    this.classList.remove('show');
+  });
+});
+  </script>
+</body>
+</html>
