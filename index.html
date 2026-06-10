@@ -127,6 +127,13 @@ body {
 }
 .send-btn:hover { background: #7c6cf7; }
 .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.refresh-btn {
+  padding: 8px 16px; border: 1px solid rgba(108,92,231,0.4); border-radius: 20px;
+  background: rgba(108,92,231,0.15); color: var(--accent-light); font-size: 13px;
+  font-weight: 600; cursor: pointer; transition: all 0.2s;
+}
+.refresh-btn:hover { background: rgba(108,92,231,0.3); }
+.refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .preview-area { max-width: 800px; margin: 4px auto 0; }
 .preview-area img { max-height: 60px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); }
 
@@ -199,6 +206,7 @@ body {
           📷
           <input type="file" id="msg-image" accept="image/*" hidden>
         </label>
+        <button class="refresh-btn" id="refresh-btn">🔄 刷新</button>
         <button class="send-btn" id="send-btn">发布新闻</button>
       </div>
       <div class="preview-area" id="preview-area"></div>
@@ -475,6 +483,23 @@ async function loadPublicMessages() {
   renderNews('public-news-grid', 'public-news-date', messages);
 }
 
+// 刷新留言（不退出登录）
+async function doRefresh() {
+  if (!currentUser) return;
+  const refreshBtn = document.getElementById('refresh-btn');
+  refreshBtn.disabled = true;
+  refreshBtn.textContent = '刷新中...';
+  try {
+    const messages = await fetchMessages();
+    renderNews('member-news-grid', 'member-news-date', messages);
+  } catch (err) {
+    console.error('刷新失败:', err);
+  } finally {
+    refreshBtn.disabled = false;
+    refreshBtn.textContent = '🔄 刷新';
+  }
+}
+
 // ===== 初始化 =====
 document.addEventListener('DOMContentLoaded', async () => {
   // 隐藏加载层
@@ -497,6 +522,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.key === 'Enter') doLogin();
   });
   document.getElementById('logout-btn').addEventListener('click', doLogout);
+  document.getElementById('refresh-btn').addEventListener('click', doRefresh);
   document.getElementById('send-btn').addEventListener('click', doSendMessage);
   document.getElementById('msg-text').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSendMessage(); }
