@@ -60,6 +60,21 @@ body {
   transition: opacity 0.2s;
 }
 .news-item img:hover { opacity: 0.85; }
+.copy-heart {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: transparent; border: 1.5px solid rgba(255,255,255,0.2);
+  cursor: pointer; transition: all 0.2s; margin-top: 8px; font-size: 14px;
+  color: rgba(255,255,255,0.35);
+}
+.copy-heart:hover {
+  border-color: #ff6b8a; color: #ff6b8a;
+  background: rgba(255,107,138,0.08);
+}
+.copy-heart.copied {
+  border-color: #ff6b8a; color: #ff6b8a;
+  background: rgba(255,107,138,0.12);
+}
 
 /* 底部登录区 */
 .login-section {
@@ -295,6 +310,9 @@ function renderNews(containerId, dateId, userMessages) {
       msgHtml += `<div class="news-category">行业评论</div>`;
       if (msg.text) msgHtml += `<h3>${escapeHtml(msg.text)}</h3>`;
       if (msg.image_url) msgHtml += `<img src="${msg.image_url}" alt="配图" onclick="showOverlay(this.src)">`;
+      // 爱心复制按钮
+      const copyText = msg.text || '';
+      msgHtml += `<span class="copy-heart" onclick="copyComment(this, '${escapeHtml(copyText).replace(/'/g, "\\'")}')" title="复制评论">♡</span>`;
       msgHtml += `</div>`;
       html += msgHtml;
     });
@@ -307,6 +325,27 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+// 复制评论到剪贴板
+function copyComment(el, text) {
+  navigator.clipboard.writeText(text).then(() => {
+    el.classList.add('copied');
+    el.textContent = '♥';
+    setTimeout(() => {
+      el.classList.remove('copied');
+      el.textContent = '♡';
+    }, 1500);
+  }).catch(() => {
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+    el.classList.add('copied');
+    el.textContent = '♥';
+    setTimeout(() => { el.classList.remove('copied'); el.textContent = '♡'; }, 1500);
+  });
 }
 
 // ===== Supabase 操作 =====
