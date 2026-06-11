@@ -351,20 +351,32 @@ async function sendMessage(username, displayName, text, imageUrl) {
   if (error) throw error;
 }
 
-// 上传图片到 Supabase Storage
+// 上传图片到 Supabase Storage（固定文件名，覆盖旧图）
 async function uploadImage(file, username) {
   if (!supabaseClient) throw new Error('Supabase 未初始化');
-  const ext = file.name.split('.').pop();
-  const path = `${username}_${Date.now()}.${ext}`;
+  const ext = file.name.split('.').pop().toLowerCase();
+  const fixedPath = `${username}_image.${ext}`;
+
+  // 先尝试删除该用户所有旧图片（不同格式都可能存在）
+  const possibleExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+  for (const oldExt of possibleExts) {
+    if (oldExt === ext) continue; // 当前格式后面会用 upsert 覆盖，跳过
+    const oldPath = `${username}_image.${oldExt}`;
+    try {
+      await supabaseClient.storage.from('images').remove([oldPath]);
+    } catch (e) { /* 旧文件不存在则忽略 */ }
+  }
+
+  // 上传新图（upsert: 同路径直接覆盖）
   const { data, error } = await supabaseClient.storage
     .from('images')
-    .upload(path, file, { upsert: true });
+    .upload(fixedPath, file, { upsert: true, contentType: file.type });
   if (error) throw error;
-  // 获取公开URL
+  // 获取公开URL（加时间戳破缓存）
   const { data: urlData } = supabaseClient.storage
     .from('images')
-    .getPublicUrl(path);
-  return urlData.publicUrl;
+    .getPublicUrl(fixedPath);
+  return urlData.publicUrl + '?t=' + Date.now();
 }
 
 // ===== 页面逻辑 =====
