@@ -72,6 +72,8 @@ body {
   background: rgba(255,107,138,0.08);
 }
 .copy-heart.copied {
+/* 游客ID时间标记 */
+.guest-id { font-size: 10px; color: rgba(255,255,255,0.18); margin-top: 4px; letter-spacing: 0.5px; }
   border-color: #ff6b8a; color: #ff6b8a;
   background: rgba(255,107,138,0.12);
 }
@@ -352,6 +354,12 @@ function renderNews(containerId, dateId, userMessages) {
     userMessages.forEach(msg => {
       let msgHtml = `<div class="news-item">`;
       msgHtml += `<div class="news-category">行业评论</div>`;
+      // 游客ID时间标记
+      const ts = msg.created_at ? new Date(msg.created_at) : new Date();
+      const hh = String(ts.getHours()).padStart(2,'0');
+      const mm = String(ts.getMinutes()).padStart(2,'0');
+      const ss = String(ts.getSeconds()).padStart(2,'0');
+      msgHtml += `<div class="guest-id">线上网友${hh}${mm}${ss}</div>`;
       if (msg.text) msgHtml += `<h3>${escapeHtml(msg.text)}</h3>`;
       if (msg.image_url) msgHtml += `<img src="${msg.image_url}" alt="配图" onclick="showOverlay(this.src)">`;
       if (msg.audio_url) msgHtml += `<audio controls src="${msg.audio_url}" preload="metadata"></audio>`;
