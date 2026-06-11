@@ -452,17 +452,17 @@ async function uploadImage(file, username) {
   // 先尝试删除该用户所有旧图片（不同格式都可能存在）
   const possibleExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
   for (const oldExt of possibleExts) {
-    if (oldExt === ext) continue; // 当前格式后面会用 upsert 覆盖，跳过
+    // 删除所有格式（包括当前格式），避免 upsert 触发 RLS UPDATE 策略
     const oldPath = `${username}_image.${oldExt}`;
     try {
       await supabaseClient.storage.from('images').remove([oldPath]);
     } catch (e) { /* 旧文件不存在则忽略 */ }
   }
 
-  // 上传新图（upsert: 同路径直接覆盖）
+  // 上传新图（已删除旧文件，无需 upsert）
   const { data, error } = await supabaseClient.storage
     .from('images')
-    .upload(fixedPath, file, { upsert: true, contentType: file.type });
+    .upload(fixedPath, file, { contentType: file.type });
   if (error) throw error;
   // 获取公开URL（加时间戳破缓存）
   const { data: urlData } = supabaseClient.storage
@@ -480,14 +480,14 @@ async function uploadAudio(blob, username) {
   // 删除其他格式的旧语音
   const possibleExts = ['webm', 'ogg', 'm4a'];
   for (const oldExt of possibleExts) {
-    if (oldExt === ext) continue;
+    // 删除所有格式（包括当前格式），避免 upsert 触发 RLS UPDATE 策略
     try { await supabaseClient.storage.from('images').remove([`${username}_voice.${oldExt}`]); } catch(e) {}
   }
 
-  // 上传（upsert 覆盖）
+  // 上传（已删除旧语音，无需 upsert）
   const { data, error } = await supabaseClient.storage
     .from('images')
-    .upload(fixedPath, blob, { upsert: true, contentType: blob.type || 'audio/webm' });
+    .upload(fixedPath, blob, { contentType: blob.type || 'audio/webm' });
   if (error) throw error;
 
   const { data: urlData } = supabaseClient.storage
