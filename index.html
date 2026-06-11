@@ -751,6 +751,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     this.classList.remove('show');
   });
 });
+
+// 30秒自动刷新评论
+setInterval(async () => {
+  if (!currentUser) return;
+  try {
+    const messages = await fetchMessages();
+    renderNews('member-news-grid', 'member-news-date', messages);
+  } catch (err) {
+    console.error('自动刷新失败:', err);
+  }
+}, 30000);
+
   </script>
 </body>
 </html>
