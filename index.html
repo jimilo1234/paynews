@@ -467,12 +467,20 @@ async function uploadImage(file, username) {
 // 上传语音到 Supabase Storage（固定文件名，覆盖旧语音）
 async function uploadAudio(blob, username) {
   if (!supabaseClient) throw new Error('Supabase 未初始化');
-  const fixedPath = `${username}_voice.webm`;
+  const ext = blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm';
+  const fixedPath = `${username}_voice.${ext}`;
+
+  // 删除其他格式的旧语音
+  const possibleExts = ['webm', 'ogg', 'm4a'];
+  for (const oldExt of possibleExts) {
+    if (oldExt === ext) continue;
+    try { await supabaseClient.storage.from('images').remove([`${username}_voice.${oldExt}`]); } catch(e) {}
+  }
 
   // 上传（upsert 覆盖）
   const { data, error } = await supabaseClient.storage
     .from('images')
-    .upload(fixedPath, blob, { upsert: true, contentType: 'audio/webm' });
+    .upload(fixedPath, blob, { upsert: true, contentType: blob.type || 'audio/webm' });
   if (error) throw error;
 
   const { data: urlData } = supabaseClient.storage
@@ -484,6 +492,7 @@ async function uploadAudio(blob, username) {
 // ===== 页面逻辑 =====
 
 let pendingVoiceBlob = null;
+let pendingVoiceMime = 'audio/webm';
 let mediaRecorder = null;
 let recChunks = [];
 let recTimer = null;
@@ -492,14 +501,27 @@ let recSeconds = 0;
 async function startRecording() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+    // 选择浏览器支持的 mimeType
+    let mimeType = 'audio/webm';
+    if (!MediaRecorder.isTypeSupported(mimeType)) {
+      mimeType = 'audio/webm;codecs=opus';
+    }
+    if (!MediaRecorder.isTypeSupported(mimeType)) {
+      mimeType = 'audio/ogg;codecs=opus';
+    }
+    if (!MediaRecorder.isTypeSupported(mimeType)) {
+      mimeType = 'audio/mp4';
+    }
+    mediaRecorder = new MediaRecorder(stream, { mimeType });
     recChunks = [];
     recSeconds = 0;
+    const finalMimeType = mimeType;
 
     mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recChunks.push(e.data); };
     mediaRecorder.onstop = () => {
       stream.getTracks().forEach(t => t.stop());
-      pendingVoiceBlob = new Blob(recChunks, { type: 'audio/webm' });
+      pendingVoiceBlob = new Blob(recChunks, { type: finalMimeType });
+      pendingVoiceMime = finalMimeType;
       const dur = recSeconds;
       document.getElementById('recording-bar').classList.remove('show');
       document.getElementById('voice-btn').classList.remove('recording');
@@ -640,7 +662,7 @@ async function doSendMessage() {
 
   } catch (err) {
     console.error('发布失败:', err);
-    alert('发布失败，请重试');
+    alert('发布失败: ' + (err.message || '请重试'));
   } finally {
     sendBtn.disabled = false;
     sendBtn.textContent = '发布新闻';
