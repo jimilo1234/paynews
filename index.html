@@ -75,6 +75,40 @@ body {
   border-color: #ff6b8a; color: #ff6b8a;
   background: rgba(255,107,138,0.12);
 }
+/* 语音录制 */
+.voice-btn { font-size: 22px; cursor: pointer; transition: transform 0.15s; user-select: none; }
+.voice-btn:hover { transform: scale(1.15); }
+.voice-btn.recording { animation: pulse-red 1s infinite; }
+@keyframes pulse-red { 0%,100%{color:#ff6b6b;} 50%{color:#ff3333;} }
+.recording-bar {
+  display: none; align-items: center; gap: 10px;
+  max-width: 800px; margin: 4px auto 0; padding: 8px 12px;
+  background: rgba(255,60,60,0.08); border: 1px solid rgba(255,60,60,0.2);
+  border-radius: 8px; font-size: 13px; color: #ff6b6b;
+}
+.recording-bar.show { display: flex; }
+.recording-bar .rec-dot { width:8px; height:8px; border-radius:50%; background:#ff4444; animation: blink 1s infinite; }
+@keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+.recording-bar .rec-stop {
+  margin-left: auto; padding: 4px 12px; border-radius: 6px;
+  background: rgba(255,60,60,0.15); border: 1px solid rgba(255,60,60,0.3);
+  color: #ff6b6b; cursor: pointer; font-size: 12px;
+}
+.recording-bar .rec-stop:hover { background: rgba(255,60,60,0.25); }
+.voice-preview {
+  display: none; align-items: center; gap: 8px;
+  max-width: 800px; margin: 4px auto 0; padding: 6px 12px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px; font-size: 12px; color: var(--text-dim);
+}
+.voice-preview.show { display: flex; }
+.voice-preview .voice-del {
+  margin-left: auto; cursor: pointer; color: #ff6b6b; font-size: 14px;
+}
+.news-item audio {
+  width: 100%; max-width: 280px; height: 36px; margin-top: 8px;
+  border-radius: 8px;
+}
 
 /* 底部登录区 */
 .login-section {
@@ -221,8 +255,18 @@ body {
           📷
           <input type="file" id="msg-image" accept="image/*" hidden>
         </label>
+        <span class="voice-btn" id="voice-btn" title="录制语音">📢</span>
         <button class="refresh-btn" id="refresh-btn">🔄 刷新</button>
         <button class="send-btn" id="send-btn">发布新闻</button>
+      </div>
+      <div class="recording-bar" id="recording-bar">
+        <span class="rec-dot"></span>
+        <span id="rec-timer">0:00</span>
+        <span class="rec-stop" id="rec-stop">⏹ 停止</span>
+      </div>
+      <div class="voice-preview" id="voice-preview">
+        🎤 语音已录制 <span id="voice-dur"></span>
+        <span class="voice-del" id="voice-del">✕</span>
       </div>
       <div class="preview-area" id="preview-area"></div>
     </div>
@@ -310,6 +354,7 @@ function renderNews(containerId, dateId, userMessages) {
       msgHtml += `<div class="news-category">行业评论</div>`;
       if (msg.text) msgHtml += `<h3>${escapeHtml(msg.text)}</h3>`;
       if (msg.image_url) msgHtml += `<img src="${msg.image_url}" alt="配图" onclick="showOverlay(this.src)">`;
+      if (msg.audio_url) msgHtml += `<audio controls src="${msg.audio_url}" preload="metadata"></audio>`;
       // 爱心复制按钮
       const copyText = msg.text || '';
       msgHtml += `<span class="copy-heart" onclick="copyComment(this, '${escapeHtml(copyText).replace(/'/g, "\\'")}')" title="复制评论">♡</span>`;
@@ -376,7 +421,7 @@ async function fetchMessages() {
 }
 
 // 发送留言（upsert：有则更新，无则插入）
-async function sendMessage(username, displayName, text, imageUrl) {
+async function sendMessage(username, displayName, text, imageUrl, audioUrl) {
   if (!supabaseClient) throw new Error('Supabase 未初始化');
   const { error } = await supabaseClient
     .from('messages')
@@ -385,6 +430,7 @@ async function sendMessage(username, displayName, text, imageUrl) {
       display_name: displayName,
       text: text,
       image_url: imageUrl || null,
+      audio_url: audioUrl || null,
       created_at: new Date().toISOString()
     }, { onConflict: 'username' });
   if (error) throw error;
@@ -418,7 +464,79 @@ async function uploadImage(file, username) {
   return urlData.publicUrl + '?t=' + Date.now();
 }
 
+// 上传语音到 Supabase Storage（固定文件名，覆盖旧语音）
+async function uploadAudio(blob, username) {
+  if (!supabaseClient) throw new Error('Supabase 未初始化');
+  const fixedPath = `${username}_voice.webm`;
+
+  // 上传（upsert 覆盖）
+  const { data, error } = await supabaseClient.storage
+    .from('images')
+    .upload(fixedPath, blob, { upsert: true, contentType: 'audio/webm' });
+  if (error) throw error;
+
+  const { data: urlData } = supabaseClient.storage
+    .from('images')
+    .getPublicUrl(fixedPath);
+  return urlData.publicUrl + '?t=' + Date.now();
+}
+
 // ===== 页面逻辑 =====
+
+let pendingVoiceBlob = null;
+let mediaRecorder = null;
+let recChunks = [];
+let recTimer = null;
+let recSeconds = 0;
+
+async function startRecording() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+    recChunks = [];
+    recSeconds = 0;
+
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recChunks.push(e.data); };
+    mediaRecorder.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      pendingVoiceBlob = new Blob(recChunks, { type: 'audio/webm' });
+      const dur = recSeconds;
+      document.getElementById('recording-bar').classList.remove('show');
+      document.getElementById('voice-btn').classList.remove('recording');
+      document.getElementById('voice-preview').classList.add('show');
+      document.getElementById('voice-dur').textContent = `${dur}秒`;
+      clearInterval(recTimer);
+    };
+
+    mediaRecorder.start();
+    document.getElementById('recording-bar').classList.add('show');
+    document.getElementById('voice-btn').classList.add('recording');
+    document.getElementById('rec-timer').textContent = '0:00';
+
+    recTimer = setInterval(() => {
+      recSeconds++;
+      const m = Math.floor(recSeconds / 60);
+      const s = recSeconds % 60;
+      document.getElementById('rec-timer').textContent = `${m}:${s < 10 ? '0' : ''}${s}`;
+      if (recSeconds >= 60) stopRecording();
+    }, 1000);
+  } catch (err) {
+    console.error('无法获取麦克风:', err);
+    alert('无法访问麦克风，请检查权限设置');
+  }
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.stop();
+  }
+}
+
+function cancelVoice() {
+  pendingVoiceBlob = null;
+  document.getElementById('voice-preview').classList.remove('show');
+  document.getElementById('voice-dur').textContent = '';
+}
 
 async function doLogin() {
   const account = document.getElementById('login-account').value.trim();
@@ -466,12 +584,16 @@ function doLogout() {
   currentUser = null;
   pendingImage = null;
   pendingImageFile = null;
+  pendingVoiceBlob = null;
+  if (mediaRecorder && mediaRecorder.state === 'recording') stopRecording();
   document.getElementById('member-page').classList.remove('active');
   document.getElementById('public-page').classList.add('active');
   document.getElementById('login-account').value = '';
   document.getElementById('login-password').value = '';
   document.getElementById('login-error').textContent = '';
   document.getElementById('preview-area').innerHTML = '';
+  document.getElementById('voice-preview').classList.remove('show');
+  document.getElementById('voice-dur').textContent = '';
   // 刷新公共页留言
   loadPublicMessages();
 }
@@ -479,7 +601,7 @@ function doLogout() {
 async function doSendMessage() {
   if (!currentUser) return;
   const text = document.getElementById('msg-text').value.trim();
-  if (!text && !pendingImageFile) return;
+  if (!text && !pendingImageFile && !pendingVoiceBlob) return;
 
   const sendBtn = document.getElementById('send-btn');
   sendBtn.disabled = true;
@@ -487,20 +609,29 @@ async function doSendMessage() {
 
   try {
     let imageUrl = null;
+    let audioUrl = null;
 
     // 上传图片（如果有）
     if (pendingImageFile) {
       imageUrl = await uploadImage(pendingImageFile, currentUser.username);
     }
 
+    // 上传语音（如果有）
+    if (pendingVoiceBlob) {
+      audioUrl = await uploadAudio(pendingVoiceBlob, currentUser.username);
+    }
+
     // 发送留言
-    await sendMessage(currentUser.username, currentUser.displayName, text, imageUrl);
+    await sendMessage(currentUser.username, currentUser.displayName, text, imageUrl, audioUrl);
 
     // 清空输入
     document.getElementById('msg-text').value = '';
     pendingImage = null;
     pendingImageFile = null;
+    pendingVoiceBlob = null;
     document.getElementById('preview-area').innerHTML = '';
+    document.getElementById('voice-preview').classList.remove('show');
+    document.getElementById('voice-dur').textContent = '';
 
     // 刷新留言
     const messages = await fetchMessages();
@@ -576,6 +707,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSendMessage(); }
   });
   document.getElementById('msg-image').addEventListener('change', handleImageSelect);
+  document.getElementById('voice-btn').addEventListener('click', startRecording);
+  document.getElementById('rec-stop').addEventListener('click', stopRecording);
+  document.getElementById('voice-del').addEventListener('click', cancelVoice);
   document.getElementById('img-overlay').addEventListener('click', function() {
     this.classList.remove('show');
   });
