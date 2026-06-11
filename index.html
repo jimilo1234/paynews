@@ -420,19 +420,26 @@ async function fetchMessages() {
   return data || [];
 }
 
-// 发送留言（upsert：有则更新，无则插入）
+// 发送留言（先删除旧记录再插入新记录，绕过 upsert RLS 问题）
 async function sendMessage(username, displayName, text, imageUrl, audioUrl) {
   if (!supabaseClient) throw new Error('Supabase 未初始化');
+  // 先删除该用户的旧留言
+  const { error: delErr } = await supabaseClient
+    .from('messages')
+    .delete()
+    .eq('username', username);
+  if (delErr) console.warn('删除旧留言失败:', delErr);
+  // 插入新留言
   const { error } = await supabaseClient
     .from('messages')
-    .upsert({
+    .insert({
       username: username,
       display_name: displayName,
       text: text,
       image_url: imageUrl || null,
       audio_url: audioUrl || null,
       created_at: new Date().toISOString()
-    }, { onConflict: 'username' });
+    });
   if (error) throw error;
 }
 
