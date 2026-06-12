@@ -361,6 +361,8 @@ function renderNews(containerId, dateId, userMessages) {
       const ss = String(ts.getSeconds()).padStart(2,'0');
       msgHtml += `<div class="news-category-line"><div class="news-category">行业评论</div><div class="guest-id">线上网友${hh}${mm}${ss}</div></div>`;
       if (msg.text) msgHtml += `<h3>${escapeHtml(msg.text)}</h3>`;
+      // 评论下方添加伪装描述（取第一条新闻摘要）
+      if (MOCK_NEWS.length > 0) msgHtml += `<p>${MOCK_NEWS[0].summary}</p>`;
       if (msg.image_url) msgHtml += `<img src="${msg.image_url}" alt="配图" onclick="showOverlay(this.src)">`;
       if (msg.audio_url) msgHtml += `<audio controls src="${msg.audio_url}" preload="metadata"></audio>`;
       // 爱心复制按钮
