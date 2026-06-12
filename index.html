@@ -43,7 +43,8 @@ body {
 .page-inner { padding: 30px 20px 40px; }
 .newspaper-header { text-align: center; margin-bottom: 30px; }
 .newspaper-header h1 { font-size: 28px; font-weight: 700; letter-spacing: 4px; color: var(--accent-light); margin-bottom: 6px; }
-.newspaper-header .date { font-size: 13px; color: var(--text-dim); }
+.newspaper-header .date { font-size: 13px; color: var(--text-dim); transition: color 0.3s; }
+.newspaper-header .date.has-update { color: #ff4d4d; }
 .header-line { height: 2px; background: linear-gradient(90deg, transparent, var(--accent), transparent); margin-top: 12px; }
 
 .news-grid { max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
@@ -323,6 +324,7 @@ const MOCK_NEWS = [
 let currentUser = null;  // { username, displayName }
 let pendingImage = null;  // base64 preview
 let pendingImageFile = null;  // File object for upload
+let lastMessageSnapshot = '';  // 用于检测新消息
 
 // ===== 工具函数 =====
 function showOverlay(src) {
@@ -337,10 +339,19 @@ function getDateStr() {
 }
 
 // ===== 渲染新闻 =====
-function renderNews(containerId, dateId, userMessages) {
+function renderNews(containerId, dateId, userMessages, isAutoRefresh) {
   const container = document.getElementById(containerId);
   const dateEl = document.getElementById(dateId);
   dateEl.textContent = getDateStr();
+
+  // 自动刷新时检测新消息 → 日期变红
+  if (dateId === 'member-news-date') {
+    const newSnapshot = userMessages.map(m => m.id || m.created_at).join(',');
+    if (isAutoRefresh && lastMessageSnapshot && newSnapshot !== lastMessageSnapshot) {
+      dateEl.classList.add('has-update');
+    }
+    lastMessageSnapshot = newSnapshot;
+  }
 
   let html = MOCK_NEWS.map(item => `
     <div class="news-item">
@@ -711,7 +722,9 @@ async function doRefresh() {
   refreshBtn.textContent = '刷新中...';
   try {
     const messages = await fetchMessages();
-    renderNews('member-news-grid', 'member-news-date', messages);
+    renderNews('member-news-grid', 'member-news-date', messages, false);
+    // 手动刷新时恢复颜色
+    document.getElementById('member-news-date').classList.remove('has-update');
   } catch (err) {
     console.error('刷新失败:', err);
   } finally {
@@ -759,7 +772,7 @@ setInterval(async () => {
   if (!currentUser) return;
   try {
     const messages = await fetchMessages();
-    renderNews('member-news-grid', 'member-news-date', messages);
+    renderNews('member-news-grid', 'member-news-date', messages, true);
   } catch (err) {
     console.error('自动刷新失败:', err);
   }
