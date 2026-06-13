@@ -61,6 +61,17 @@ body {
   transition: opacity 0.2s;
 }
 .news-item img:hover { opacity: 0.85; }
+/* 图片折叠 */
+.img-toggle {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-top: 8px; padding: 4px 12px; border-radius: 14px;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+  color: var(--text-dim); font-size: 12px; cursor: pointer; transition: all 0.2s;
+  user-select: none;
+}
+.img-toggle:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+.img-fold { display: none; margin-top: 8px; }
+.img-fold.show { display: block; }
 .copy-heart {
   display: inline-flex; align-items: center; justify-content: center;
   width: 28px; height: 28px; border-radius: 50%;
@@ -242,7 +253,7 @@ body {
 
   <!-- 页面2：登录后 -->
   <div id="member-page" class="page">
-    <button class="logout-btn" id="logout-btn">退出</button>
+    <button class="logout-btn" id="logout-btn">刷新新闻</button>
     <div class="page-inner" style="padding-bottom:80px;">
       <div class="newspaper-header">
         <h1>支付行业新闻</h1>
@@ -375,7 +386,7 @@ function renderNews(containerId, dateId, userMessages, isAutoRefresh) {
       if (msg.text) msgHtml += `<h3>${escapeHtml(msg.text)}</h3>`;
       // 评论下方添加伪装描述（取第一条新闻摘要）
       if (MOCK_NEWS.length > 0) msgHtml += `<p>${MOCK_NEWS[0].summary}</p>`;
-      if (msg.image_url) msgHtml += `<img src="${msg.image_url}" alt="配图" onclick="showOverlay(this.src)">`;
+      if (msg.image_url) msgHtml += `<span class="img-toggle" onclick="toggleImg(this)">📷 查看图片</span><div class="img-fold"><img src="${msg.image_url}" alt="配图" onclick="showOverlay(this.src)"></div>`;
       if (msg.audio_url) msgHtml += `<audio controls src="${msg.audio_url}" preload="metadata"></audio>`;
       // 爱心复制按钮
       const copyText = msg.text || '';
@@ -392,6 +403,18 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+// 展开/折叠图片
+function toggleImg(el) {
+  const foldDiv = el.nextElementSibling;
+  if (foldDiv.classList.contains('show')) {
+    foldDiv.classList.remove('show');
+    el.textContent = '📷 查看图片';
+  } else {
+    foldDiv.classList.add('show');
+    el.textContent = '📷 收起图片';
+  }
 }
 
 // 复制评论到剪贴板
