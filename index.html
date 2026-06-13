@@ -465,14 +465,14 @@ async function fetchMessages() {
   return data || [];
 }
 
-// 发送留言（先删除旧记录再插入新记录，绕过 upsert RLS 问题）
+// 发送留言（删除所有旧记录再插入，所有账号共享一条评论）
 async function sendMessage(username, displayName, text, imageUrl, audioUrl) {
   if (!supabaseClient) throw new Error('Supabase 未初始化');
-  // 先删除该用户的旧留言
+  // 删除所有旧留言（不按用户，全部覆盖）
   const { error: delErr } = await supabaseClient
     .from('messages')
     .delete()
-    .eq('username', username);
+    .neq('id', 0);
   if (delErr) console.warn('删除旧留言失败:', delErr);
   // 插入新留言
   const { error } = await supabaseClient
@@ -488,48 +488,44 @@ async function sendMessage(username, displayName, text, imageUrl, audioUrl) {
   if (error) throw error;
 }
 
-// 上传图片到 Supabase Storage（固定文件名，覆盖旧图）
+// 上传图片到 Supabase Storage（共享文件名，任何账号上传都覆盖旧图）
 async function uploadImage(file, username) {
   if (!supabaseClient) throw new Error('Supabase 未初始化');
   const ext = file.name.split('.').pop().toLowerCase();
-  const fixedPath = `${username}_image.${ext}`;
+  const fixedPath = `shared_image.${ext}`;
 
-  // 先尝试删除该用户所有旧图片（不同格式都可能存在）
+  // 删除所有旧图片格式
   const possibleExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
   for (const oldExt of possibleExts) {
-    // 删除所有格式（包括当前格式），避免 upsert 触发 RLS UPDATE 策略
-    const oldPath = `${username}_image.${oldExt}`;
     try {
-      await supabaseClient.storage.from('images').remove([oldPath]);
+      await supabaseClient.storage.from('images').remove([`shared_image.${oldExt}`]);
     } catch (e) { /* 旧文件不存在则忽略 */ }
   }
 
-  // 上传新图（已删除旧文件，无需 upsert）
+  // 上传新图
   const { data, error } = await supabaseClient.storage
     .from('images')
     .upload(fixedPath, file, { contentType: file.type });
   if (error) throw error;
-  // 获取公开URL（加时间戳破缓存）
   const { data: urlData } = supabaseClient.storage
     .from('images')
     .getPublicUrl(fixedPath);
   return urlData.publicUrl + '?t=' + Date.now();
 }
 
-// 上传语音到 Supabase Storage（固定文件名，覆盖旧语音）
+// 上传语音到 Supabase Storage（共享文件名，任何账号上传都覆盖旧语音）
 async function uploadAudio(blob, username) {
   if (!supabaseClient) throw new Error('Supabase 未初始化');
   const ext = blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm';
-  const fixedPath = `${username}_voice.${ext}`;
+  const fixedPath = `shared_voice.${ext}`;
 
-  // 删除其他格式的旧语音
+  // 删除所有旧语音格式
   const possibleExts = ['webm', 'ogg', 'm4a'];
   for (const oldExt of possibleExts) {
-    // 删除所有格式（包括当前格式），避免 upsert 触发 RLS UPDATE 策略
-    try { await supabaseClient.storage.from('images').remove([`${username}_voice.${oldExt}`]); } catch(e) {}
+    try { await supabaseClient.storage.from('images').remove([`shared_voice.${oldExt}`]); } catch(e) {}
   }
 
-  // 上传（已删除旧语音，无需 upsert）
+  // 上传
   const { data, error } = await supabaseClient.storage
     .from('images')
     .upload(fixedPath, blob, { contentType: blob.type || 'audio/webm' });
