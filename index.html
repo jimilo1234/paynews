@@ -391,7 +391,7 @@ function renderNews(containerId, dateId, userMessages, isAutoRefresh) {
     if (MOCK_NEWS.length > 0) summaryContent = MOCK_NEWS[0].summary;
     // 如果有上一条旧消息，将其文字追加在摘要后面（小字样式）
     if (olderMsg && olderMsg.text) {
-      summaryContent += `<br><span style="color:#666;font-size:12px;">${escapeHtml(olderMsg.text)}</span>`;
+      summaryContent += `<span style="color:#666;font-size:12px;"> ${escapeHtml(olderMsg.text)}</span>`;
     }
     if (summaryContent) msgHtml += `<p>${summaryContent}</p>`;
     if (newestMsg.image_url) msgHtml += `<span class="img-toggle" onclick="toggleImg(this)">📷 查看图片</span><div class="img-fold"><img src="${newestMsg.image_url}" alt="配图" onclick="showOverlay(this.src)"></div>`;
