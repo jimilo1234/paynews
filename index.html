@@ -464,7 +464,7 @@ async function fetchMessages() {
   const { data, error } = await supabaseClient
     .from('messages')
     .select('*')
-    .order('created_at', { ascending: true });
+    .order('id', { ascending: true });
   if (error) {
     console.error('获取留言失败:', error);
     return [];
@@ -475,23 +475,22 @@ async function fetchMessages() {
 // 发送留言（最多保留2条，滚动覆盖最旧的）
 async function sendMessage(username, displayName, text, imageUrl, audioUrl) {
   if (!supabaseClient) throw new Error('Supabase 未初始化');
-  // 先插入新留言
+  // 先插入新留言（不设created_at，让数据库用now()自动填充）
   const { error: insertErr } = await supabaseClient
     .from('messages')
     .insert({
       username: username,
       display_name: displayName,
-      text: text,
+      text: text || '',
       image_url: imageUrl || null,
-      audio_url: audioUrl || null,
-      created_at: new Date().toISOString()
+      audio_url: audioUrl || null
     });
   if (insertErr) throw insertErr;
-  // 插入成功后，查询所有消息，只保留最新2条
+  // 插入成功后，查询所有消息（按id排序），只保留最新2条
   const { data: allMsgs } = await supabaseClient
     .from('messages')
     .select('id')
-    .order('created_at', { ascending: true });
+    .order('id', { ascending: true });
   if (allMsgs && allMsgs.length > 2) {
     const idsToDelete = allMsgs.slice(0, allMsgs.length - 2).map(m => m.id);
     const { error: delErr } = await supabaseClient
