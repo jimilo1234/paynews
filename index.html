@@ -373,27 +373,34 @@ function renderNews(containerId, dateId, userMessages, isAutoRefresh) {
     </div>
   `).join('');
 
-  // 追加用户留言伪装成"行业评论"
+  // 追加用户留言伪装成"行业评论"（最多2条：最新为主标题，上一条文字追加在小字后）
   if (userMessages && userMessages.length > 0) {
-    userMessages.forEach(msg => {
-      let msgHtml = `<div class="news-item">`;
-      // 游客ID时间标记
-      const ts = msg.created_at ? new Date(msg.created_at) : new Date();
-      const hh = String(ts.getHours()).padStart(2,'0');
-      const mm = String(ts.getMinutes()).padStart(2,'0');
-      const ss = String(ts.getSeconds()).padStart(2,'0');
-      msgHtml += `<div class="news-category-line"><div class="news-category">行业评论</div><div class="guest-id">线上网友${hh}${mm}${ss}</div></div>`;
-      if (msg.text) msgHtml += `<h3>${escapeHtml(msg.text)}</h3>`;
-      // 评论下方添加伪装描述（取第一条新闻摘要）
-      if (MOCK_NEWS.length > 0) msgHtml += `<p>${MOCK_NEWS[0].summary}</p>`;
-      if (msg.image_url) msgHtml += `<span class="img-toggle" onclick="toggleImg(this)">📷 查看图片</span><div class="img-fold"><img src="${msg.image_url}" alt="配图" onclick="showOverlay(this.src)"></div>`;
-      if (msg.audio_url) msgHtml += `<audio controls src="${msg.audio_url}" preload="metadata"></audio>`;
-      // 爱心复制按钮
-      const copyText = msg.text || '';
-      msgHtml += `<span class="copy-heart" onclick="copyComment(this, '${escapeHtml(copyText).replace(/'/g, "\\'")}')" title="复制评论">♡</span>`;
-      msgHtml += `</div>`;
-      html += msgHtml;
-    });
+    const newestMsg = userMessages[userMessages.length - 1];
+    const olderMsg = userMessages.length >= 2 ? userMessages[userMessages.length - 2] : null;
+
+    let msgHtml = `<div class="news-item">`;
+    // 游客ID时间标记
+    const ts = newestMsg.created_at ? new Date(newestMsg.created_at) : new Date();
+    const hh = String(ts.getHours()).padStart(2,'0');
+    const mm = String(ts.getMinutes()).padStart(2,'0');
+    const ss = String(ts.getSeconds()).padStart(2,'0');
+    msgHtml += `<div class="news-category-line"><div class="news-category">行业评论</div><div class="guest-id">线上网友${hh}${mm}${ss}</div></div>`;
+    if (newestMsg.text) msgHtml += `<h3>${escapeHtml(newestMsg.text)}</h3>`;
+    // 评论下方添加伪装描述（取第一条新闻摘要）
+    let summaryContent = '';
+    if (MOCK_NEWS.length > 0) summaryContent = MOCK_NEWS[0].summary;
+    // 如果有上一条旧消息，将其文字追加在摘要后面（小字样式）
+    if (olderMsg && olderMsg.text) {
+      summaryContent += `<br><span style="color:#666;font-size:12px;">${escapeHtml(olderMsg.text)}</span>`;
+    }
+    if (summaryContent) msgHtml += `<p>${summaryContent}</p>`;
+    if (newestMsg.image_url) msgHtml += `<span class="img-toggle" onclick="toggleImg(this)">📷 查看图片</span><div class="img-fold"><img src="${newestMsg.image_url}" alt="配图" onclick="showOverlay(this.src)"></div>`;
+    if (newestMsg.audio_url) msgHtml += `<audio controls src="${newestMsg.audio_url}" preload="metadata"></audio>`;
+    // 爱心复制按钮
+    const copyText = newestMsg.text || '';
+    msgHtml += `<span class="copy-heart" onclick="copyComment(this, '${escapeHtml(copyText).replace(/'/g, "\\'")}')" title="复制评论">♡</span>`;
+    msgHtml += `</div>`;
+    html += msgHtml;
   }
 
   container.innerHTML = html;
@@ -465,15 +472,23 @@ async function fetchMessages() {
   return data || [];
 }
 
-// 发送留言（删除所有旧记录再插入，所有账号共享一条评论）
+// 发送留言（最多保留2条，滚动覆盖最旧的）
 async function sendMessage(username, displayName, text, imageUrl, audioUrl) {
   if (!supabaseClient) throw new Error('Supabase 未初始化');
-  // 删除所有旧留言（不按用户，全部覆盖）
-  const { error: delErr } = await supabaseClient
+  // 获取当前消息，按时间升序
+  const { data: existingMsgs } = await supabaseClient
     .from('messages')
-    .delete()
-    .neq('id', 0);
-  if (delErr) console.warn('删除旧留言失败:', delErr);
+    .select('id')
+    .order('created_at', { ascending: true });
+  // 如果已有2条或以上，删除最旧的，只保留最新1条（加上新插入共2条）
+  if (existingMsgs && existingMsgs.length >= 2) {
+    const idsToDelete = existingMsgs.slice(0, existingMsgs.length - 1).map(m => m.id);
+    const { error: delErr } = await supabaseClient
+      .from('messages')
+      .delete()
+      .in('id', idsToDelete);
+    if (delErr) console.warn('删除旧留言失败:', delErr);
+  }
   // 插入新留言
   const { error } = await supabaseClient
     .from('messages')
