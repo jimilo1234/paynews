@@ -475,22 +475,8 @@ async function fetchMessages() {
 // 发送留言（最多保留2条，滚动覆盖最旧的）
 async function sendMessage(username, displayName, text, imageUrl, audioUrl) {
   if (!supabaseClient) throw new Error('Supabase 未初始化');
-  // 获取当前消息，按时间升序
-  const { data: existingMsgs } = await supabaseClient
-    .from('messages')
-    .select('id')
-    .order('created_at', { ascending: true });
-  // 如果已有2条或以上，删除最旧的，只保留最新1条（加上新插入共2条）
-  if (existingMsgs && existingMsgs.length >= 2) {
-    const idsToDelete = existingMsgs.slice(0, existingMsgs.length - 1).map(m => m.id);
-    const { error: delErr } = await supabaseClient
-      .from('messages')
-      .delete()
-      .in('id', idsToDelete);
-    if (delErr) console.warn('删除旧留言失败:', delErr);
-  }
-  // 插入新留言
-  const { error } = await supabaseClient
+  // 先插入新留言
+  const { error: insertErr } = await supabaseClient
     .from('messages')
     .insert({
       username: username,
@@ -500,7 +486,20 @@ async function sendMessage(username, displayName, text, imageUrl, audioUrl) {
       audio_url: audioUrl || null,
       created_at: new Date().toISOString()
     });
-  if (error) throw error;
+  if (insertErr) throw insertErr;
+  // 插入成功后，查询所有消息，只保留最新2条
+  const { data: allMsgs } = await supabaseClient
+    .from('messages')
+    .select('id')
+    .order('created_at', { ascending: true });
+  if (allMsgs && allMsgs.length > 2) {
+    const idsToDelete = allMsgs.slice(0, allMsgs.length - 2).map(m => m.id);
+    const { error: delErr } = await supabaseClient
+      .from('messages')
+      .delete()
+      .in('id', idsToDelete);
+    if (delErr) console.warn('删除旧留言失败:', delErr);
+  }
 }
 
 // 上传图片到 Supabase Storage（共享文件名，任何账号上传都覆盖旧图）
