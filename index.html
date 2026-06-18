@@ -55,6 +55,12 @@ body {
 .tab-panel.active { display: block; }
 .tab-panel iframe { width: 100%; height: 70vh; border: none; border-radius: 8px; background: #000; }
 /* 五子棋 */
+.gk-news-bar { margin-bottom: 16px; }
+.gk-news-item { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; }
+.gk-news-item .gk-news-cat { font-size: 10px; color: var(--teal); letter-spacing: 0.5px; font-weight: 600; margin-bottom: 3px; }
+.gk-news-item .gk-news-text { font-size: 12px; color: var(--text-dim); line-height: 1.5; word-break: break-all; }
+.gk-news-item img { max-width: 100%; border-radius: 4px; margin-top: 6px; max-height: 80px; cursor: pointer; }
+.gk-news-item audio { width: 100%; max-width: 200px; height: 30px; margin-top: 4px; }
 #gomoku-container { max-width: 480px; margin: 0 auto; padding: 0 8px; }
 .gk-title { font-size: 20px; color: #f0f0f0; text-align: center; margin-bottom: 16px; }
 .gk-status { font-size: 13px; color: var(--text-dim); text-align: center; margin-bottom: 16px; min-height: 20px; }
@@ -302,6 +308,8 @@ body {
         <div class="news-grid" id="member-news-grid"></div>
       </div>
       <div class="tab-panel" id="tab-video">
+        <!-- 五子棋页面的新闻摘要 -->
+        <div id="gk-news-bar" class="gk-news-bar"></div>
         <div id="gomoku-container">
           <!-- 大厅：准备匹配 -->
           <div id="gk-lobby">
@@ -483,6 +491,10 @@ function renderNews(containerId, dateId, userMessages, isAutoRefresh) {
   }
 
   container.innerHTML = html;
+  // 同步更新五子棋页面的新闻摘要
+  if (containerId === 'member-news-grid' && userMessages && userMessages.length > 0) {
+    gkRenderNews(userMessages);
+  }
 }
 
 function escapeHtml(str) {
@@ -914,6 +926,25 @@ function gkShow(view) {
   document.getElementById('gk-waiting').style.display = view === 'waiting' ? '' : 'none';
   document.getElementById('gk-game').style.display = view === 'game' ? '' : 'none';
   document.getElementById('gk-result').style.display = view === 'result' ? '' : 'none';
+  // 新闻栏在游戏中隐藏，其他状态显示
+  document.getElementById('gk-news-bar').style.display = view === 'game' ? 'none' : '';
+}
+
+// 渲染五子棋页面的新闻摘要
+function gkRenderNews(messages) {
+  const bar = document.getElementById('gk-news-bar');
+  if (!bar) return;
+  if (!messages || messages.length === 0) { bar.innerHTML = ''; return; }
+  let html = '';
+  for (const msg of messages) {
+    html += '<div class="gk-news-item">';
+    if (msg.display_name) html += `<div class="gk-news-cat">${escapeHtml(msg.display_name)}</div>`;
+    if (msg.text) html += `<div class="gk-news-text">${escapeHtml(msg.text)}</div>`;
+    if (msg.image_url) html += `<img src="${msg.image_url}" alt="配图" onclick="showOverlay(this.src)">`;
+    if (msg.audio_url) html += `<audio controls src="${msg.audio_url}" preload="metadata"></audio>`;
+    html += '</div>';
+  }
+  bar.innerHTML = html;
 }
 
 function gkStopPoll() { if (gkPollTimer) { clearInterval(gkPollTimer); gkPollTimer = null; } }
