@@ -46,6 +46,14 @@ body {
 .newspaper-header .date { font-size: 13px; color: var(--text-dim); transition: color 0.3s; }
 .newspaper-header .date.has-update { color: #ff4d4d; }
 .header-line { height: 2px; background: linear-gradient(90deg, transparent, var(--accent), transparent); margin-top: 12px; }
+/* Tab 栏 */
+.tab-bar { display: flex; gap: 0; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+.tab-btn { flex: 1; padding: 10px 0; text-align: center; font-size: 14px; color: var(--text-dim); background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
+.tab-btn.active { color: var(--accent-light); border-bottom-color: var(--accent); }
+.tab-btn:hover { color: #ccc; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+.tab-panel iframe { width: 100%; height: 70vh; border: none; border-radius: 8px; background: #000; }
 
 .news-grid { max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 .news-item {
@@ -260,7 +268,18 @@ body {
         <p class="date" id="member-news-date"></p>
         <div class="header-line"></div>
       </div>
-      <div class="news-grid" id="member-news-grid"></div>
+      <!-- Tab 切换栏 -->
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="tab-news">行业简报</button>
+        <button class="tab-btn" data-tab="tab-video">在线视频</button>
+      </div>
+      <!-- Tab 内容区 -->
+      <div class="tab-panel active" id="tab-news">
+        <div class="news-grid" id="member-news-grid"></div>
+      </div>
+      <div class="tab-panel" id="tab-video">
+        <iframe src="https://fn.aska.xin:55555/v" allowfullscreen></iframe>
+      </div>
     </div>
 
     <div class="message-input-area">
@@ -811,6 +830,19 @@ setInterval(async () => {
     console.error('自动刷新失败:', err);
   }
 }, 30000);
+
+// ===== Tab 切换 =====
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const targetId = this.dataset.tab;
+    // 切换按钮激活态
+    this.closest('.tab-bar').querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    // 切换面板
+    this.closest('.page-inner').querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById(targetId).classList.add('active');
+  });
+});
 
   </script>
 </body>
