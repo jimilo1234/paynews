@@ -917,7 +917,11 @@ function gkShow(view) {
 }
 
 function gkStopPoll() { if (gkPollTimer) { clearInterval(gkPollTimer); gkPollTimer = null; } }
-function gkStartPoll(interval) { gkStopPoll(); gkPollTimer = interval < 1000 ? setInterval(gkSyncWaiting, 1500) : setInterval(gkSyncGame, interval); }
+function gkStartPoll(mode) {
+  gkStopPoll();
+  if (mode === 'waiting') { gkPollTimer = setInterval(gkSyncWaiting, 1500); }
+  else { gkPollTimer = setInterval(gkSyncGame, 2000); }
+}
 
 // 清理过期数据
 async function gkCleanup() {
@@ -965,7 +969,7 @@ async function gomokuReady() {
     gkCurrentGame = { ...updated, myRole: 2 };
     gkRenderGame();
     gkShow('game');
-    gkStartPoll(2000);
+    gkStartPoll('game');
   } else {
     // 3. 没人等 → 自己创建等待
     const board = '0'.repeat(GK_SIZE * GK_SIZE);
@@ -984,7 +988,7 @@ async function gomokuReady() {
     if (error) { alert('准备失败: ' + error.message); return; }
     gkCurrentGame = { ...created, myRole: 1 };
     gkShow('waiting');
-    gkStartPoll(1500); // 等待时1.5秒轮询
+    gkStartPoll('waiting');
   }
 }
 
@@ -1008,7 +1012,7 @@ async function gkSyncWaiting() {
     gkStopPoll();
     gkRenderGame();
     gkShow('game');
-    gkStartPoll(2000); // 游戏中2秒轮询
+    gkStartPoll('game'); // 游戏中2秒轮询
   }
 }
 
