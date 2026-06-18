@@ -286,7 +286,13 @@ body {
         <div class="news-grid" id="member-news-grid"></div>
       </div>
       <div class="tab-panel" id="tab-video">
-        <iframe src="https://www.coze.cn/" allowfullscreen></iframe>
+        <div class="video-launch" id="coze-fallback" style="display:none;">
+          <div class="video-launch-icon">🤖</div>
+          <h3>扣子 Coze</h3>
+          <p>内嵌加载失败，请在新窗口中打开</p>
+          <button class="video-launch-btn" onclick="window.open('https://www.coze.cn/','_blank')">打开扣子 →</button>
+        </div>
+        <iframe id="coze-frame" src="https://www.coze.cn/" allowfullscreen></iframe>
       </div>
     </div>
 
@@ -851,6 +857,37 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.getElementById(targetId).classList.add('active');
   });
 });
+
+// ===== iframe 降级检测 =====
+(function() {
+  var frame = document.getElementById('coze-frame');
+  var fallback = document.getElementById('coze-fallback');
+  if (!frame || !fallback) return;
+  // 超时检测：5秒后如果 iframe 还没成功加载，显示降级按钮
+  var timer = setTimeout(function() {
+    frame.style.display = 'none';
+    fallback.style.display = 'block';
+  }, 5000);
+  frame.addEventListener('load', function() {
+    clearTimeout(timer);
+    try {
+      // 同源可以检查内容，跨域会抛错 → 抛错说明iframe确实加载了跨域页面
+      var doc = frame.contentDocument || frame.contentWindow.document;
+      if (doc && doc.body && doc.body.innerHTML.length < 50) {
+        // 内容太少，可能是空页
+        frame.style.display = 'none';
+        fallback.style.display = 'block';
+      }
+    } catch(e) {
+      // 跨域抛错 = iframe确实加载了外部页面，保留iframe
+    }
+  });
+  frame.addEventListener('error', function() {
+    clearTimeout(timer);
+    frame.style.display = 'none';
+    fallback.style.display = 'block';
+  });
+})();
 
   </script>
 </body>
