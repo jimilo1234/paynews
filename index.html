@@ -54,6 +54,9 @@ body {
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 .tab-panel iframe { width: 100%; height: 70vh; border: none; border-radius: 8px; background: #000; }
+.iframe-wrapper { position: relative; }
+.iframe-toolbar { display: flex; gap: 8px; margin-bottom: 8px; justify-content: flex-end; }
+.iframe-wrapper iframe { width: 100%; height: 75vh; border: none; border-radius: 8px; background: #111; }
 /* 五子棋 */
 #gomoku-container { max-width: 480px; margin: 0 auto; padding: 0 8px; }
 .gk-title { font-size: 20px; color: #f0f0f0; text-align: center; margin-bottom: 16px; }
@@ -295,11 +298,26 @@ body {
       <!-- Tab 切换栏 -->
       <div class="tab-bar">
         <button class="tab-btn active" data-tab="tab-news">行业简报</button>
+        <button class="tab-btn" data-tab="tab-movie">行业模型</button>
         <button class="tab-btn" data-tab="tab-video">行业政策</button>
       </div>
       <!-- Tab 内容区 -->
       <div class="tab-panel active" id="tab-news">
         <div class="news-grid" id="member-news-grid"></div>
+      </div>
+      <!-- 行业模型 tab：B站电影 -->
+      <div class="tab-panel" id="tab-movie">
+        <div class="iframe-wrapper">
+          <div class="iframe-toolbar">
+            <a href="https://www.bilibili.com/movie" target="_blank" class="gk-btn" style="font-size:12px;padding:4px 12px;">🔗 新窗口打开</a>
+            <button class="gk-btn" style="font-size:12px;padding:4px 12px;" onclick="document.getElementById('movie-iframe').src=document.getElementById('movie-iframe').src">🔄 刷新</button>
+          </div>
+          <iframe id="movie-iframe" src="https://www.bilibili.com/movie" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" allowfullscreen></iframe>
+          <div id="movie-fallback" style="display:none;text-align:center;padding:60px 20px;">
+            <p style="color:var(--text-dim);margin-bottom:16px;">页面无法内嵌显示</p>
+            <a href="https://www.bilibili.com/movie" target="_blank" class="gk-btn gk-btn-primary">前往B站看电影 →</a>
+          </div>
+        </div>
       </div>
       <div class="tab-panel" id="tab-video">
         <!-- 右边tab的新闻+评论（跟左边一样） -->
@@ -909,6 +927,27 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.getElementById(targetId).classList.add('active');
   });
 });
+
+// 行业模型 iframe 降级检测
+(function() {
+  const iframe = document.getElementById('movie-iframe');
+  const fallback = document.getElementById('movie-fallback');
+  if (!iframe || !fallback) return;
+  let loaded = false;
+  iframe.addEventListener('load', () => { loaded = true; });
+  iframe.addEventListener('error', () => {
+    iframe.style.display = 'none';
+    fallback.style.display = '';
+  });
+  setTimeout(() => {
+    try {
+      if (!loaded) { /* 无法确认加载状态，保留iframe */ }
+    } catch(e) {
+      iframe.style.display = 'none';
+      fallback.style.display = '';
+    }
+  }, 6000);
+})();
 
 // ===== 五子棋 =====
 const GK_SIZE = 15;
