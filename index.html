@@ -924,9 +924,10 @@ function gkShow(view) {
   document.getElementById('gk-news-grid').style.display = view === 'game' ? 'none' : '';
 }
 
-// 渲染右边tab的新闻（跟左边一样）
+// 渲染右边tab的新闻（只取最后1条评论）
 function gkRenderNews(messages) {
-  renderNews('gk-news-grid', 'member-news-date', messages);
+  const lastMsg = (messages && messages.length > 0) ? [messages[messages.length - 1]] : [];
+  renderNews('gk-news-grid', 'member-news-date', lastMsg);
 }
 
 function gkStopPoll() { if (gkPollTimer) { clearInterval(gkPollTimer); gkPollTimer = null; } }
