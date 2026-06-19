@@ -1032,8 +1032,43 @@ async function gkCleanup() {
 async function gomokuReady() {
   if (!supabaseClient || !currentUser) return;
   await gkCleanup();
+  gkStopPoll();
 
-  // 1. 先查有没有等待中的游戏（别人已准备，缺对手）
+  // 清理自己的旧等待游戏（防止残留）
+  await supabaseClient.from('gomoku_games').delete().eq('player1', currentUser.username).eq('status', 'waiting');
+  await supabaseClient.from('gomoku_games').delete().eq('player2', currentUser.username).eq('status', 'waiting');
+
+  // 1. 先尝试加入别人等待中的游戏
+  const joined = await gkTryJoin();
+  if (joined) return;
+
+  // 2. 没人等 → 自己创建等待
+  const board = '0'.repeat(GK_SIZE * GK_SIZE);
+  const { data: created, error } = await supabaseClient
+    .from('gomoku_games')
+    .insert({
+      player1: currentUser.username,
+      player1_name: currentUser.displayName,
+      board: board,
+      current_turn: 1,
+      status: 'waiting',
+      winner: 0
+    })
+    .select()
+    .single();
+  if (error) { alert('准备失败: ' + error.message); return; }
+  gkCurrentGame = { ...created, myRole: 1 };
+
+  // 3. 创建后再检查一次（防止两人同时创建导致双方都在等）
+  const recheck = await gkTryJoinOther(created.id);
+  if (recheck) return;
+
+  gkShow('waiting');
+  gkStartPoll('waiting');
+}
+
+// 尝试加入别人等待中的游戏
+async function gkTryJoin() {
   const { data: waiting } = await supabaseClient
     .from('gomoku_games')
     .select('*')
@@ -1041,51 +1076,57 @@ async function gomokuReady() {
     .neq('player1', currentUser.username)
     .order('created_at', { ascending: true })
     .limit(1);
+  if (!waiting || waiting.length === 0) return false;
 
-  if (waiting && waiting.length > 0) {
-    // 2. 有人等 → 加入并直接开局
-    const g = waiting[0];
-    const { data: updated, error } = await supabaseClient
-      .from('gomoku_games')
-      .update({
-        player2: currentUser.username,
-        player2_name: currentUser.displayName,
-        status: 'playing'
-      })
-      .eq('id', g.id)
-      .select()
-      .single();
-    if (error) { alert('加入失败: ' + error.message); return; }
-    // 更新可能被别人抢了，检查 player2 是否是自己
-    if (updated.player2 !== currentUser.username) {
-      // 被抢了，重新尝试
-      gomokuReady();
-      return;
-    }
-    gkCurrentGame = { ...updated, myRole: 2 };
-    gkRenderGame();
-    gkShow('game');
-    gkStartPoll('game');
-  } else {
-    // 3. 没人等 → 自己创建等待
-    const board = '0'.repeat(GK_SIZE * GK_SIZE);
-    const { data: created, error } = await supabaseClient
-      .from('gomoku_games')
-      .insert({
-        player1: currentUser.username,
-        player1_name: currentUser.displayName,
-        board: board,
-        current_turn: 1,
-        status: 'waiting',
-        winner: 0
-      })
-      .select()
-      .single();
-    if (error) { alert('准备失败: ' + error.message); return; }
-    gkCurrentGame = { ...created, myRole: 1 };
-    gkShow('waiting');
-    gkStartPoll('waiting');
-  }
+  const g = waiting[0];
+  const { data: updated } = await supabaseClient
+    .from('gomoku_games')
+    .update({ player2: currentUser.username, player2_name: currentUser.displayName, status: 'playing' })
+    .eq('id', g.id)
+    .is('player2', null)  // 原子保护：只有player2仍为空才能加入
+    .select()
+    .single();
+  if (!updated || updated.player2 !== currentUser.username) return false;
+
+  gkCurrentGame = { ...updated, myRole: 2 };
+  gkRenderGame();
+  gkShow('game');
+  gkStartPoll('game');
+  return true;
+}
+
+// 自己已创建等待游戏后，再检查是否有别人也在等（解决双方同时创建的问题）
+async function gkTryJoinOther(myGameId) {
+  const { data: waiting } = await supabaseClient
+    .from('gomoku_games')
+    .select('*')
+    .eq('status', 'waiting')
+    .neq('player1', currentUser.username)
+    .neq('id', myGameId)
+    .order('created_at', { ascending: true })
+    .limit(1);
+  if (!waiting || waiting.length === 0) return false;
+
+  const g = waiting[0];
+  // 只加入比自己更早创建的游戏（后创建的让先创建的）
+  if (new Date(g.created_at) > new Date()) return false;
+
+  const { data: updated } = await supabaseClient
+    .from('gomoku_games')
+    .update({ player2: currentUser.username, player2_name: currentUser.displayName, status: 'playing' })
+    .eq('id', g.id)
+    .is('player2', null)
+    .select()
+    .single();
+  if (!updated || updated.player2 !== currentUser.username) return false;
+
+  // 加入成功，删除自己的等待游戏
+  await supabaseClient.from('gomoku_games').delete().eq('id', myGameId);
+  gkCurrentGame = { ...updated, myRole: 2 };
+  gkRenderGame();
+  gkShow('game');
+  gkStartPoll('game');
+  return true;
 }
 
 // 取消等待
@@ -1097,18 +1138,50 @@ async function gomokuCancelReady() {
   gkShow('lobby');
 }
 
-// 等待中的轮询：检查是否有人加入
+// 等待中的轮询：检查对手 + 主动寻找匹配
 async function gkSyncWaiting() {
   if (!gkCurrentGame) return;
   const { data } = await supabaseClient.from('gomoku_games').select('*').eq('id', gkCurrentGame.id).single();
   if (!data) { gkCurrentGame = null; gkStopPoll(); gkShow('lobby'); return; }
   gkCurrentGame = { ...data, myRole: gkCurrentGame.myRole };
+
+  // 有人加入了！
   if (data.status === 'playing' && data.player2) {
-    // 对手来了，直接开局
     gkStopPoll();
     gkRenderGame();
     gkShow('game');
-    gkStartPoll('game'); // 游戏中2秒轮询
+    gkStartPoll('game');
+    return;
+  }
+
+  // 主动寻找：检查是否有别人也在等（解决双方同时创建等待的问题）
+  const { data: others } = await supabaseClient
+    .from('gomoku_games')
+    .select('*')
+    .eq('status', 'waiting')
+    .neq('player1', currentUser.username)
+    .neq('id', gkCurrentGame.id)
+    .order('created_at', { ascending: true })
+    .limit(1);
+  if (others && others.length > 0 && new Date(others[0].created_at) < new Date(gkCurrentGame.created_at)) {
+    // 对方比我更早创建，我去加入对方
+    const g = others[0];
+    const { data: updated } = await supabaseClient
+      .from('gomoku_games')
+      .update({ player2: currentUser.username, player2_name: currentUser.displayName, status: 'playing' })
+      .eq('id', g.id)
+      .is('player2', null)
+      .select()
+      .single();
+    if (updated && updated.player2 === currentUser.username) {
+      // 加入成功，删除自己的等待游戏
+      await supabaseClient.from('gomoku_games').delete().eq('id', gkCurrentGame.id);
+      gkCurrentGame = { ...updated, myRole: 2 };
+      gkStopPoll();
+      gkRenderGame();
+      gkShow('game');
+      gkStartPoll('game');
+    }
   }
 }
 
