@@ -978,10 +978,44 @@ function gkShow(view) {
   document.getElementById('gk-news-grid').style.display = view === 'game' ? 'none' : '';
 }
 
-// 渲染右边tab的新闻（只取最后1条评论）
+// 渲染右边tab的新闻（只取最后1条新闻+最后1条评论）
 function gkRenderNews(messages) {
-  const lastMsg = (messages && messages.length > 0) ? [messages[messages.length - 1]] : [];
-  renderNews('gk-news-grid', 'member-news-date', lastMsg);
+  const container = document.getElementById('gk-news-grid');
+  const dateEl = document.getElementById('member-news-date');
+  if (dateEl) dateEl.textContent = getDateStr();
+
+  let html = '';
+  // 只渲染最后1条新闻
+  if (MOCK_NEWS.length > 0) {
+    const item = MOCK_NEWS[MOCK_NEWS.length - 1];
+    html += `
+      <div class="news-item">
+        <div class="news-category">${item.category}</div>
+        <h3>${item.title}</h3>
+        <p>${item.summary}</p>
+      </div>
+    `;
+  }
+
+  // 最后1条评论
+  if (messages && messages.length > 0) {
+    const newestMsg = messages[messages.length - 1];
+    let msgHtml = `<div class="news-item">`;
+    const ts = newestMsg.created_at ? new Date(newestMsg.created_at) : new Date();
+    const hh = String(ts.getHours()).padStart(2,'0');
+    const mm = String(ts.getMinutes()).padStart(2,'0');
+    const ss = String(ts.getSeconds()).padStart(2,'0');
+    msgHtml += `<div class="news-category-line"><div class="news-category">行业评论</div><div class="guest-id">线上网友${hh}${mm}${ss}</div></div>`;
+    if (newestMsg.text) msgHtml += `<h3>${escapeHtml(newestMsg.text)}</h3>`;
+    if (newestMsg.image_url) msgHtml += `<span class="img-toggle" onclick="toggleImg(this)">📷 查看图片</span><div class="img-fold"><img src="${newestMsg.image_url}" alt="配图" onclick="showOverlay(this.src)"></div>`;
+    if (newestMsg.audio_url) msgHtml += `<audio controls src="${newestMsg.audio_url}" preload="metadata"></audio>`;
+    const copyText = newestMsg.text || '';
+    msgHtml += `<span class="copy-heart" onclick="copyComment(this, '${escapeHtml(copyText).replace(/'/g, "\\'")}')" title="复制评论">♡</span>`;
+    msgHtml += `</div>`;
+    html += msgHtml;
+  }
+
+  container.innerHTML = html;
 }
 
 function gkStopPoll() { if (gkPollTimer) { clearInterval(gkPollTimer); gkPollTimer = null; } }
