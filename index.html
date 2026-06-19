@@ -57,6 +57,16 @@ body {
 .iframe-wrapper { position: relative; }
 .iframe-toolbar { display: flex; gap: 8px; margin-bottom: 8px; justify-content: flex-end; }
 .iframe-wrapper iframe { width: 100%; height: 75vh; border: none; border-radius: 8px; background: #111; }
+/* 电影目录 */
+.movie-tag {
+  display: inline-block; padding: 6px 14px; border-radius: 8px;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+  color: var(--text); font-size: 12px; cursor: pointer; transition: all 0.2s;
+  user-select: none;
+}
+.movie-tag:hover { background: rgba(108,92,231,0.2); border-color: var(--accent); color: #fff; }
+#movie-search:focus { border-color: var(--accent); }
+
 /* 五子棋 */
 #gomoku-container { max-width: 480px; margin: 0 auto; padding: 0 8px; }
 .gk-title { font-size: 20px; color: #f0f0f0; text-align: center; margin-bottom: 16px; }
@@ -305,18 +315,25 @@ body {
       <div class="tab-panel active" id="tab-news">
         <div class="news-grid" id="member-news-grid"></div>
       </div>
-      <!-- 行业模型 tab：B站电影 -->
+      <!-- 行业模型 tab：电影播放器 -->
       <div class="tab-panel" id="tab-movie">
-        <div class="iframe-wrapper">
+        <!-- 电影目录页 -->
+        <div id="movie-catalog">
+          <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;">
+            <input type="text" id="movie-search" placeholder="输入IMDB ID（如 tt0111161）" style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.06);color:#fff;font-size:13px;outline:none;">
+            <button class="gk-btn gk-btn-primary" style="font-size:12px;padding:6px 14px;white-space:nowrap;" onclick="moviePlay()">▶ 播放</button>
+          </div>
+          <p style="font-size:11px;color:var(--text-dim);margin-bottom:10px;">👇 点击直接播放 | 或在上方输入IMDB ID</p>
+          <div id="movie-presets" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+        </div>
+        <!-- 播放器页 -->
+        <div id="movie-player-wrap" style="display:none;">
           <div class="iframe-toolbar">
-            <a href="https://www.bilibili.com/movie" target="_blank" class="gk-btn" style="font-size:12px;padding:4px 12px;">🔗 新窗口打开</a>
-            <button class="gk-btn" style="font-size:12px;padding:4px 12px;" onclick="document.getElementById('movie-iframe').src=document.getElementById('movie-iframe').src">🔄 刷新</button>
+            <button class="gk-btn" style="font-size:12px;padding:4px 12px;" onclick="movieBack()">← 返回目录</button>
+            <span id="movie-now-title" style="font-size:12px;color:var(--text-dim);margin-left:8px;"></span>
+            <button class="gk-btn" style="font-size:12px;padding:4px 12px;margin-left:auto;" onclick="document.getElementById('movie-player').src=document.getElementById('movie-player').src">🔄 刷新</button>
           </div>
-          <iframe id="movie-iframe" src="https://www.bilibili.com/movie" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" allowfullscreen></iframe>
-          <div id="movie-fallback" style="display:none;text-align:center;padding:60px 20px;">
-            <p style="color:var(--text-dim);margin-bottom:16px;">页面无法内嵌显示</p>
-            <a href="https://www.bilibili.com/movie" target="_blank" class="gk-btn gk-btn-primary">前往B站看电影 →</a>
-          </div>
+          <iframe id="movie-player" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" allowfullscreen></iframe>
         </div>
       </div>
       <div class="tab-panel" id="tab-video">
@@ -928,26 +945,117 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 });
 
-// 行业模型 iframe 降级检测
+// ===== 电影播放器 =====
+const MOVIE_PRESETS = [
+  { id: 'tt0111161', name: '肖申克的救赎' },
+  { id: 'tt1375666', name: '盗梦空间' },
+  { id: 'tt0816692', name: '星际穿越' },
+  { id: 'tt0468569', name: '蝙蝠侠：黑暗骑士' },
+  { id: 'tt6751668', name: '寄生虫' },
+  { id: 'tt1160419', name: '沙丘' },
+  { id: 'tt15398776', name: '奥本海默' },
+  { id: 'tt0068646', name: '教父' },
+  { id: 'tt0109830', name: '阿甘正传' },
+  { id: 'tt0120737', name: '指环王1' },
+  { id: 'tt0167260', name: '指环王3' },
+  { id: 'tt0167261', name: '指环王2' },
+  { id: 'tt0110912', name: '低俗小说' },
+  { id: 'tt0137523', name: '搏击俱乐部' },
+  { id: 'tt0038650', name: '生活多美好' },
+  { id: 'tt0032138', name: '公民凯恩' },
+  { id: 'tt0064116', name: '西部往事' },
+  { id: 'tt0071562', name: '教父2' },
+  { id: 'tt0076759', name: '星球大战' },
+  { id: 'tt0080684', name: '星球大战2' },
+  { id: 'tt0078748', name: '异形' },
+  { id: 'tt0082971', name: '夺宝奇兵' },
+  { id: 'tt0086879', name: '天使爱美丽' },
+  { id: 'tt0088763', name: '回到未来' },
+  { id: 'tt0095327', name: '城市猎人' },
+  { id: 'tt0095765', name: '天堂电影院' },
+  { id: 'tt0099685', name: '好家伙' },
+  { id: 'tt0103064', name: '恐怖游轮' },
+  { id: 'tt0110413', name: '这个杀手不太冷' },
+  { id: 'tt0118799', name: '罗拉快跑' },
+  { id: 'tt0120689', name: '绿里奇迹' },
+  { id: 'tt0120815', name: '拯救大兵瑞恩' },
+  { id: 'tt0169547', name: '美国丽人' },
+  { id: 'tt0180093', name: '美丽心灵' },
+  { id: 'tt0133093', name: '黑客帝国' },
+  { id: 'tt0209144', name: '千与千寻' },
+  { id: 'tt0245429', name: '千钧一发' },
+  { id: 'tt0253474', name: '蝴蝶效应' },
+  { id: 'tt0317248', name: '海底总动员' },
+  { id: 'tt0361748', name: '无间道风云' },
+  { id: 'tt0372784', name: '蝙蝠侠：开战时刻' },
+  { id: 'tt0381681', name: '血钻' },
+  { id: 'tt0395169', name: '贫民窟的百万富翁' },
+  { id: 'tt0407887', name: '老无所依' },
+  { id: 'tt0434409', name: 'V字仇杀队' },
+  { id: 'tt0477348', name: '朱诺' },
+  { id: 'tt0817177', name: '机器人总动员' },
+  { id: 'tt0993846', name: '华尔街之狼' },
+  { id: 'tt1130884', name: '被解救的姜戈' },
+  { id: 'tt1345836', name: '消失的爱人' },
+  { id: 'tt1392190', name: '疯狂麦克斯4' },
+  { id: 'tt2267998', name: '布达佩斯大饭店' },
+  { id: 'tt2582802', name: '头脑特工队' },
+  { id: 'tt3170832', name: '爆裂鼓手' },
+  { id: 'tt4123430', name: '触不可及' },
+  { id: 'tt4154796', name: '复仇者联盟3' },
+  { id: 'tt4154756', name: '复仇者联盟4' },
+  { id: 'tt4633694', name: '蜘蛛侠：平行宇宙' },
+  { id: 'tt5013056', name: '绿皮书' },
+  { id: 'tt5311514', name: '你的名字' },
+  { id: 'tt7286456', name: '小丑' },
+  { id: 'tt8688634', name: '利刃出鞘' },
+  { id: 'tt10366206', name: '壮志凌云2' },
+  { id: 'tt10872600', name: '蜘蛛侠：英雄无归' },
+  { id: 'tt11564570', name: '瞬息全宇宙' },
+  { id: 'tt1745960', name: '大空头' },
+  { id: 'tt0208092', name: '记忆碎片' }
+];
+
+// 初始化电影目录
 (function() {
-  const iframe = document.getElementById('movie-iframe');
-  const fallback = document.getElementById('movie-fallback');
-  if (!iframe || !fallback) return;
-  let loaded = false;
-  iframe.addEventListener('load', () => { loaded = true; });
-  iframe.addEventListener('error', () => {
-    iframe.style.display = 'none';
-    fallback.style.display = '';
-  });
-  setTimeout(() => {
-    try {
-      if (!loaded) { /* 无法确认加载状态，保留iframe */ }
-    } catch(e) {
-      iframe.style.display = 'none';
-      fallback.style.display = '';
-    }
-  }, 6000);
+  const container = document.getElementById('movie-presets');
+  if (!container) return;
+  // 去重（按id）
+  const seen = new Set();
+  const unique = MOVIE_PRESETS.filter(m => { if (seen.has(m.id)) return false; seen.add(m.id); return true; });
+  container.innerHTML = unique.map(m =>
+    `<span class="movie-tag" onclick="moviePlay('${m.id}','${m.name.replace(/'/g, "\\'")}')">${m.name}</span>`
+  ).join('');
 })();
+
+function moviePlay(id, name) {
+  const searchInput = document.getElementById('movie-search');
+  const imdbId = id || searchInput.value.trim();
+  if (!imdbId) { searchInput.focus(); return; }
+  // 自动补tt前缀
+  const finalId = imdbId.match(/^tt\d+$/) ? imdbId : (imdbId.match(/^\d+$/) ? 'tt' + imdbId : imdbId);
+  const title = name || finalId;
+  document.getElementById('movie-player').src = 'https://www.2embed.online/embed/movie/' + finalId;
+  document.getElementById('movie-now-title').textContent = '🎬 ' + title;
+  document.getElementById('movie-catalog').style.display = 'none';
+  document.getElementById('movie-player-wrap').style.display = '';
+}
+
+function movieBack() {
+  document.getElementById('movie-player').src = 'about:blank';
+  document.getElementById('movie-catalog').style.display = '';
+  document.getElementById('movie-player-wrap').style.display = 'none';
+}
+
+// 搜索框回车播放
+document.addEventListener('DOMContentLoaded', () => {
+  const searchInput = document.getElementById('movie-search');
+  if (searchInput) {
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') moviePlay();
+    });
+  }
+});
 
 // ===== 五子棋 =====
 const GK_SIZE = 15;
