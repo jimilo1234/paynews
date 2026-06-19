@@ -1035,7 +1035,7 @@ function moviePlay(id, name) {
   // 自动补tt前缀
   const finalId = imdbId.match(/^tt\d+$/) ? imdbId : (imdbId.match(/^\d+$/) ? 'tt' + imdbId : imdbId);
   const title = name || finalId;
-  document.getElementById('movie-player').src = 'https://www.2embed.online/embed/movie/' + finalId;
+  document.getElementById('movie-player').src = 'https://vidsrc.fyi/embed/movie/' + finalId;
   document.getElementById('movie-now-title').textContent = '🎬 ' + title;
   document.getElementById('movie-catalog').style.display = 'none';
   document.getElementById('movie-player-wrap').style.display = '';
