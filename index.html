@@ -972,6 +972,10 @@ setInterval(async () => {
   }
 }, 30000);
 
+// 30分钟自动清理Storage中的图片和语音
+cleanupStorage(); // 页面加载时先清理一次
+setInterval(cleanupStorage, 30 * 60 * 1000);
+
 // ===== Tab 切换 =====
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', function() {
@@ -1087,6 +1091,30 @@ async function gkCleanup() {
   await supabaseClient.from('gomoku_games').delete().eq('status','finished').lt('updated_at', oneHourAgo);
   const tenMinAgo = new Date(Date.now() - 600000).toISOString();
   await supabaseClient.from('gomoku_games').delete().eq('status','waiting').lt('created_at', tenMinAgo);
+}
+
+// 清理Storage中的图片和语音文件，同时置空messages中的媒体链接
+async function cleanupStorage() {
+  if (!supabaseClient) return;
+  try {
+    // 列出images bucket中的所有文件
+    const { data: files, error } = await supabaseClient.storage.from('images').list('', { limit: 100 });
+    if (error) { console.warn('列出存储文件失败:', error); return; }
+    if (files && files.length > 0) {
+      const filePaths = files.map(f => f.name);
+      const { error: delErr } = await supabaseClient.storage.from('images').remove(filePaths);
+      if (delErr) console.warn('删除存储文件失败:', delErr);
+      else console.log(`已清理 ${filePaths.length} 个存储文件`);
+    }
+    // 置空messages中的image_url和audio_url
+    const { error: msgErr } = await supabaseClient
+      .from('messages')
+      .update({ image_url: null, audio_url: null })
+      .not('image_url', 'is', null);
+    if (msgErr) console.warn('清理消息媒体链接失败:', msgErr);
+  } catch (e) {
+    console.warn('Storage清理异常:', e);
+  }
 }
 
 // 点击"准备"：匹配模式
