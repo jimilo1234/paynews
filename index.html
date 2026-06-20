@@ -355,10 +355,11 @@ html.light .theme-toggle { background: rgba(108,92,231,0.15); border-color: rgba
       <div class="tab-panel active" id="tab-news">
         <div class="news-grid" id="member-news-grid"></div>
       </div>
-      <!-- AI助手 tab：扣子Chat SDK -->
+      <!-- AI助手 tab：iframe嵌入 -->
       <div class="tab-panel" id="tab-movie">
-        <div id="coze-chat-container" style="height:70vh;position:relative;"></div>
-        <p id="coze-chat-hint" style="font-size:12px;color:var(--text-dim);text-align:center;margin-top:8px;">AI助手加载中，请稍候...</p>
+        <div class="iframe-wrapper">
+          <iframe id="ai-assistant-iframe" src="https://bailiangroup.aiforce.cloud/app/app_4ke12xkaz43m2" style="width:100%;height:75vh;border:none;border-radius:8px;background:var(--bg-dark);"></iframe>
+        </div>
       </div>
       <div class="tab-panel" id="tab-video">
         <!-- 右边tab的新闻+评论（跟左边一样） -->
@@ -434,8 +435,6 @@ html.light .theme-toggle { background: rgba(108,92,231,0.15); border-color: rgba
 
   <!-- Supabase JS SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- 扣子 Chat SDK -->
-  <script src="https://lf-cdn.coze.cn/obj/unpkg/flow-platform/chat-app-sdk/latest/libs/cn/index.js"></script>
 
   <script>
 // ===== Supabase 配置 =====
@@ -993,48 +992,12 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     // 切换面板
     this.closest('.page-inner').querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.getElementById(targetId).classList.add('active');
-    // AI助手tab：初始化/显示Chat SDK
-    if (targetId === 'tab-movie') {
-      initCozeChat();
-      if (cozeWebSDK && cozeWebSDK.showChatBot) cozeWebSDK.showChatBot();
-    } else {
-      if (cozeWebSDK && cozeWebSDK.hideChatBot) cozeWebSDK.hideChatBot();
+    // AI助手tab：无需额外初始化（iframe自动加载）
+    if (targetId !== 'tab-movie') {
+      // 切走时无需处理
     }
   });
 });
-
-// ===== AI助手（扣子Chat SDK） =====
-let cozeWebSDK = null;
-let cozeChatInited = false;
-
-function initCozeChat() {
-  if (cozeChatInited) return;
-  const container = document.getElementById('coze-chat-container');
-  if (!container || typeof CozeWebSDK === 'undefined') return;
-  cozeChatInited = true;
-  try {
-    cozeWebSDK = new CozeWebSDK.WebChatClient({
-      config: {
-        botId: '7626746763487002932',
-      },
-      auth: {
-        type: 'unauth',
-      },
-      ui: {
-        asstBtn: { isNeed: false },
-        base: { layout: 'pc' },
-      },
-      chatBot: {
-        title: '小吉老板',
-        el: container,
-      },
-    });
-    document.getElementById('coze-chat-hint').style.display = 'none';
-  } catch (e) {
-    console.error('Chat SDK 初始化失败:', e);
-    document.getElementById('coze-chat-hint').textContent = 'AI助手加载失败，请刷新页面重试';
-  }
-}
 
 // ===== 五子棋 =====
 const GK_SIZE = 15;
