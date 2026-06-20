@@ -510,7 +510,7 @@ function renderNews(containerId, dateId, userMessages, isAutoRefresh) {
   }
 
   let html = MOCK_NEWS.map(item => {
-    const catClass = (hasNewMessages && item.category === '监管动态') ? 'news-category new-msg' : 'news-category';
+    const catClass = hasNewMessages ? 'news-category new-msg' : 'news-category';
     return `
     <div class="news-item">
       <div class="${catClass}">${item.category}</div>
