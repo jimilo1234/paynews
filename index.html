@@ -86,7 +86,16 @@ html.light .theme-toggle { background: rgba(108,92,231,0.15); border-color: rgba
 
 /* 新闻区域通用 */
 .page-inner { padding: 30px 20px 40px; }
-.newspaper-header { text-align: center; margin-bottom: 30px; }
+.newspaper-header {
+  text-align: center; margin-bottom: 0; padding: 16px 0 0;
+  position: sticky; top: 0; z-index: 150;
+  background: var(--bg-dark);
+  transition: box-shadow 0.3s;
+}
+.newspaper-header.scrolled {
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+.tab-bar { position: sticky; top: 78px; z-index: 150; background: var(--bg-dark); }
 .newspaper-header h1 { font-size: 28px; font-weight: 700; letter-spacing: 4px; color: var(--accent-light); margin-bottom: 6px; }
 .newspaper-header .date { font-size: 13px; color: var(--text-dim); transition: color 0.3s; }
 .newspaper-header .date.has-update { color: #ff4d4d; }
@@ -130,7 +139,7 @@ html.light .theme-toggle { background: rgba(108,92,231,0.15); border-color: rgba
 .gk-stone.black { background: radial-gradient(circle at 35% 35%, #555, #111); }
 .gk-stone.white { background: radial-gradient(circle at 35% 35%, #fff, #ccc); border: 1px solid rgba(0,0,0,0.15); }
 
-.news-grid { max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.news-grid { max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; padding-top: 16px; }
 .news-item {
   background: var(--bg-card); border: 1px solid var(--border-card);
   border-radius: 10px; padding: 16px 20px; transition: background 0.2s;
@@ -965,6 +974,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     btn.textContent = isLight ? '☀️' : '🌙';
     localStorage.setItem('paynews-theme', isLight ? 'light' : 'dark');
   });
+
+  // 滚动时header加阴影
+  const memberPage = document.getElementById('member-page');
+  const header = memberPage ? memberPage.querySelector('.newspaper-header') : null;
+  if (memberPage && header) {
+    memberPage.addEventListener('scroll', () => {
+      header.classList.toggle('scrolled', memberPage.scrollTop > 10);
+    });
+    // 页面级滚动也监听
+    window.addEventListener('scroll', () => {
+      header.classList.toggle('scrolled', window.scrollY > 10);
+    });
+  }
 });
 
 // 30秒自动刷新评论
