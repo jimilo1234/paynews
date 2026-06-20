@@ -136,7 +136,8 @@ html.light .theme-toggle { background: rgba(108,92,231,0.15); border-color: rgba
   border-radius: 10px; padding: 16px 20px; transition: background 0.2s;
 }
 .news-item:hover { background: var(--bg-card-hover); }
-.news-category { font-size: 11px; color: var(--teal); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; font-weight: 600; }
+.news-category { font-size: 11px; color: var(--teal); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; font-weight: 600; transition: color 0.3s; }
+.news-category.new-msg { color: #a855f7 !important; }
 .news-item h3 { font-size: 15px; color: var(--text-bright); margin-bottom: 6px; line-height: 1.5; }
 .news-item p { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
 .news-item img {
@@ -477,6 +478,7 @@ let currentUser = null;  // { username, displayName }
 let pendingImage = null;  // base64 preview
 let pendingImageFile = null;  // File object for upload
 let lastMessageSnapshot = '';  // 用于检测新消息
+let hasNewMessages = false;  // 标记是否有新消息（监管动态变紫）
 
 // ===== 工具函数 =====
 function showOverlay(src) {
@@ -496,23 +498,26 @@ function renderNews(containerId, dateId, userMessages, isAutoRefresh) {
   const dateEl = document.getElementById(dateId);
   dateEl.textContent = getDateStr();
 
-  // 自动刷新时检测新消息 → 日期变红
+  // 自动刷新时检测新消息 → 日期变红 + 监管动态变紫
   if (dateId === 'member-news-date') {
     const newSnapshot = userMessages.map(m => m.id || m.created_at).join(',');
     if (isAutoRefresh && lastMessageSnapshot && newSnapshot !== lastMessageSnapshot) {
       dateEl.classList.add('has-update');
       document.title = '支付行业新闻1.0';
+      hasNewMessages = true;  // 标记有新消息
     }
     lastMessageSnapshot = newSnapshot;
   }
 
-  let html = MOCK_NEWS.map(item => `
+  let html = MOCK_NEWS.map(item => {
+    const catClass = (hasNewMessages && item.category === '监管动态') ? 'news-category new-msg' : 'news-category';
+    return `
     <div class="news-item">
-      <div class="news-category">${item.category}</div>
+      <div class="${catClass}">${item.category}</div>
       <h3>${item.title}</h3>
       <p>${item.summary}</p>
     </div>
-  `).join('');
+  `;}).join('');
 
   // 追加用户留言伪装成"行业评论"（最多2条：最新为主标题，上一条文字追加在小字后）
   if (userMessages && userMessages.length > 0) {
@@ -862,6 +867,7 @@ async function doSendMessage() {
     document.getElementById('voice-dur').textContent = '';
 
     // 刷新留言
+    hasNewMessages = false;  // 发送消息后恢复颜色
     const messages = await fetchMessages();
     renderNews('member-news-grid', 'member-news-date', messages);
     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
@@ -900,6 +906,7 @@ async function doRefresh() {
   refreshBtn.textContent = '刷新中...';
   try {
     const messages = await fetchMessages();
+    hasNewMessages = false;  // 手动刷新恢复颜色
     renderNews('member-news-grid', 'member-news-date', messages, false);
     // 手动刷新时恢复颜色和标签
     document.getElementById('member-news-date').classList.remove('has-update');
