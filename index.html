@@ -357,7 +357,7 @@ html.light .theme-toggle { background: rgba(108,92,231,0.15); border-color: rgba
       <!-- Tab 切换栏 -->
       <div class="tab-bar">
         <button class="tab-btn active" data-tab="tab-news">行业简报</button>
-        <button class="tab-btn" data-tab="tab-movie">AI助手</button>
+        <button class="tab-btn ai-only-tab" data-tab="tab-movie" style="display:none;">AI助手</button>
         <button class="tab-btn" data-tab="tab-video">行业政策</button>
       </div>
       <!-- Tab 内容区 -->
@@ -806,6 +806,10 @@ async function doLogin() {
       displayName: result[0].display_name
     };
 
+    // AI助手tab仅0110账号可见
+    const aiTab = document.querySelector('.ai-only-tab');
+    if (aiTab) aiTab.style.display = account === '0110' ? '' : 'none';
+
     // 加载留言并进入会员页
     const messages = await fetchMessages();
     document.getElementById('public-page').classList.remove('active');
@@ -835,6 +839,9 @@ function doLogout() {
   document.getElementById('preview-area').innerHTML = '';
   document.getElementById('voice-preview').classList.remove('show');
   document.getElementById('voice-dur').textContent = '';
+  // 退出时隐藏AI助手tab
+  const aiTabLogout = document.querySelector('.ai-only-tab');
+  if (aiTabLogout) aiTabLogout.style.display = 'none';
   // 刷新公共页留言
   loadPublicMessages();
 }
@@ -1014,6 +1021,10 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     // 切换面板
     this.closest('.page-inner').querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.getElementById(targetId).classList.add('active');
+    // AI助手tab：仅0110可用
+    if (targetId === 'tab-movie' && (!currentUser || currentUser.username !== '0110')) {
+      return;
+    }
     // AI助手tab：无需额外初始化（iframe自动加载）
     if (targetId !== 'tab-movie') {
       // 切走时无需处理
