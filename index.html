@@ -425,6 +425,7 @@ html.light .guest-id.broadcasting { color: #222; }
 
   <!-- 广播订阅中 -->
   <div class="walkie-broadcast-bar" id="walkie-broadcast-bar">
+    <span id="walkie-status" style="font-size:11px;opacity:0.7;margin-right:6px;"></span>
     <div class="pulse-dot"></div>
     <span>广播订阅中...</span>
   </div>
@@ -950,8 +951,9 @@ function doLogout() {
   if (walkieChannel) { try { supabaseClient.removeChannel(walkieChannel); } catch(e) {} walkieChannel = null; }
   if (presenceChannel) { try { supabaseClient.removeChannel(presenceChannel); } catch(e) {} presenceChannel = null; }
   walkieSubscribed = false;
+  walkieChannelReady = false;
   onlineSubscribers = {};
-  if (currentWalkieAudio) { currentWalkieAudio.pause(); if (currentWalkieAudio._blobUrl) URL.revokeObjectURL(currentWalkieAudio._blobUrl); currentWalkieAudio = null; }
+  stopWalkieAudio();
   document.getElementById('member-page').classList.remove('active');
   document.getElementById('public-page').classList.add('active');
   document.getElementById('login-account').value = '';
@@ -1064,21 +1066,30 @@ let pttChunks = [];
 let pttActive = false;
 let currentWalkieAudio = null;  // 追踪当前播放的对讲机音频，避免叠加
 let pttTimer = null;  // PTT录音最长时长计时器
+let walkieChannelReady = false;  // 对讲机频道是否已订阅就绪
+let walkieAudioCtx = null;  // AudioContext，在用户手势时解锁以绕过autoplay限制
 
 function initWalkieTalkie() {
   if (!supabaseClient || !currentUser) return;
+  walkieChannelReady = false;
   // 对讲机频道：只负责语音广播
   if (walkieChannel) { try { supabaseClient.removeChannel(walkieChannel); } catch(e) {} }
   walkieChannel = supabaseClient.channel('walkie-talkie', {
     config: { broadcast: { self: false } }
   });
-  walkieChannel.on('broadcast', { event: 'voice' }, (payload) => {
-    console.log('[对讲机] 收到广播事件, walkieSubscribed:', walkieSubscribed, 'payload:', payload);
+  walkieChannel.on('broadcast', { event: 'voice' }, (msg) => {
+    console.log('[对讲机] 收到广播事件, walkieSubscribed:', walkieSubscribed, 'msg:', JSON.stringify(msg).substring(0, 200));
     if (!walkieSubscribed) return;
-    playWalkieVoice(payload.payload);
+    // 兼容不同Supabase版本：msg可能是{payload:{audio,mime,from}}或直接{audio,mime,from}
+    const data = msg.payload && msg.payload.audio ? msg.payload : (msg.audio ? msg : null);
+    if (!data) { console.error('[对讲机] payload结构异常:', msg); return; }
+    playWalkieVoice(data);
   });
   walkieChannel.subscribe((status, err) => {
     console.log('[对讲机] 频道状态:', status, err || '');
+    walkieChannelReady = (status === 'SUBSCRIBED');
+    const stEl = document.getElementById('walkie-status');
+    if (stEl) stEl.textContent = status === 'SUBSCRIBED' ? '' : '[' + status + ']';
   });
   // 在线状态频道：独立Presence追踪
   if (presenceChannel) { try { supabaseClient.removeChannel(presenceChannel); } catch(e) {} }
@@ -1111,6 +1122,14 @@ function initWalkieTalkie() {
 function toggleWalkieSub() {
   walkieSubscribed = !walkieSubscribed;
   console.log('[对讲机] 订阅开关:', walkieSubscribed);
+  // 在用户手势中解锁AudioContext，绕过浏览器autoplay限制
+  if (walkieSubscribed) {
+    try {
+      if (!walkieAudioCtx) walkieAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (walkieAudioCtx.state === 'suspended') walkieAudioCtx.resume();
+      console.log('[对讲机] AudioContext已解锁, state:', walkieAudioCtx.state);
+    } catch(e) { console.warn('[对讲机] AudioContext初始化失败:', e); }
+  }
   const toggle = document.getElementById('walkie-sub-toggle');
   const icon = document.getElementById('walkie-sub-icon');
   if (walkieSubscribed) {
@@ -1120,7 +1139,7 @@ function toggleWalkieSub() {
     toggle.classList.remove('on');
     icon.innerHTML = ICO.speakerOff;
     // 关闭时隐藏广播条，停掉正在播放的音频
-    if (currentWalkieAudio) { currentWalkieAudio.pause(); if (currentWalkieAudio._blobUrl) URL.revokeObjectURL(currentWalkieAudio._blobUrl); currentWalkieAudio = null; }
+    stopWalkieAudio();
     document.getElementById('walkie-broadcast-bar').classList.remove('show');
     setGuestIdBroadcasting(false);
   }
@@ -1153,46 +1172,49 @@ function updateAllCopyIcons() {
 async function playWalkieVoice(payload) {
   const bar = document.getElementById('walkie-broadcast-bar');
   try {
-    // 先停掉上一条对讲机音频，避免叠加
-    if (currentWalkieAudio) {
-      currentWalkieAudio.pause();
-      if (currentWalkieAudio._blobUrl) URL.revokeObjectURL(currentWalkieAudio._blobUrl);
-      currentWalkieAudio = null;
-    }
+    // 先停掉上一条
+    stopWalkieAudio();
     bar.classList.add('show');
     setGuestIdBroadcasting(true);
-    // 用Blob URL替代data URL，彻底避免MIME解析问题
+
     const rawMime = payload.mime || 'audio/mp4';
     const mime = rawMime.split(';')[0];
     console.log('[对讲机] 收到语音, mime:', rawMime, '→', mime, 'base64长度:', payload.audio?.length);
-    // base64 → 二进制 → Blob → URL
+
+    // base64 → 二进制
     const binStr = atob(payload.audio);
     const bytes = new Uint8Array(binStr.length);
     for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
+
+    // 方案1: AudioContext（绕过autoplay限制，已在用户手势中解锁）
+    if (walkieAudioCtx && walkieAudioCtx.state === 'running') {
+      try {
+        const audioBuffer = await walkieAudioCtx.decodeAudioData(bytes.buffer.slice(0));
+        const source = walkieAudioCtx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(walkieAudioCtx.destination);
+        source.onended = () => { currentWalkieAudio = null; bar.classList.remove('show'); setGuestIdBroadcasting(false); console.log('[对讲机] AC播放结束'); };
+        currentWalkieAudio = source;
+        source.start(0);
+        console.log('[对讲机] AudioContext播放成功');
+        return;
+      } catch(acErr) {
+        console.warn('[对讲机] AudioContext解码失败(格式不兼容?), fallback到Audio元素:', acErr.message);
+      }
+    }
+
+    // 方案2: Audio元素 + Blob URL（fallback）
     const blob = new Blob([bytes], { type: mime });
     const blobUrl = URL.createObjectURL(blob);
-    console.log('[对讲机] Blob创建成功, size:', blob.size, 'url:', blobUrl);
     const audio = new Audio(blobUrl);
-    audio._blobUrl = blobUrl;  // 标记以便后续释放
+    audio._blobUrl = blobUrl;
     currentWalkieAudio = audio;
     audio.volume = 0.9;
-    audio.onended = () => {
-      URL.revokeObjectURL(blobUrl);
-      currentWalkieAudio = null;
-      bar.classList.remove('show');
-      setGuestIdBroadcasting(false);
-      console.log('[对讲机] 播放结束');
-    };
-    audio.onerror = (e) => {
-      URL.revokeObjectURL(blobUrl);
-      currentWalkieAudio = null;
-      bar.classList.remove('show');
-      setGuestIdBroadcasting(false);
-      console.error('[对讲机] 播放失败:', e, 'audio.error:', audio.error);
-    };
-    console.log('[对讲机] 开始播放...');
+    audio.onended = () => { URL.revokeObjectURL(blobUrl); currentWalkieAudio = null; bar.classList.remove('show'); setGuestIdBroadcasting(false); console.log('[对讲机] Audio播放结束'); };
+    audio.onerror = (e) => { URL.revokeObjectURL(blobUrl); currentWalkieAudio = null; bar.classList.remove('show'); setGuestIdBroadcasting(false); console.error('[对讲机] Audio播放失败:', audio.error); };
+    console.log('[对讲机] Audio元素播放...');
     await audio.play();
-    console.log('[对讲机] play()成功');
+    console.log('[对讲机] Audio play()成功');
   } catch (e) {
     currentWalkieAudio = null;
     console.error('[对讲机] 播放异常:', e);
@@ -1201,9 +1223,22 @@ async function playWalkieVoice(payload) {
   }
 }
 
+function stopWalkieAudio() {
+  if (!currentWalkieAudio) return;
+  try {
+    // AudioContext BufferSource
+    if (currentWalkieAudio.stop) currentWalkieAudio.stop();
+    // Audio元素
+    if (currentWalkieAudio.pause) currentWalkieAudio.pause();
+    if (currentWalkieAudio._blobUrl) URL.revokeObjectURL(currentWalkieAudio._blobUrl);
+  } catch(e) {}
+  currentWalkieAudio = null;
+}
+
 function startPTT(e) {
   e.preventDefault();
   if (pttActive || !supabaseClient || !walkieChannel) return;
+  if (!walkieChannelReady) { console.warn('[对讲机] 频道尚未就绪，等待SUBSCRIBED'); return; }
   pttActive = true;
   pttChunks = [];
   const btn = document.getElementById('walkie-btn');
