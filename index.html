@@ -230,7 +230,9 @@ html.light .walkie-sub-toggle.on .toggle-knob { background: var(--accent-light);
 }
 /* 游客ID时间标记 */
 .news-category-line { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.guest-id { font-size: 11px; color: var(--text-muted); letter-spacing: 0.5px; }
+.guest-id { font-size: 11px; color: var(--text-muted); letter-spacing: 0.5px; transition: color 0.3s; }
+.guest-id.broadcasting { color: #111; }
+html.light .guest-id.broadcasting { color: #222; }
 /* 语音录制 */
 .voice-btn { font-size: 22px; cursor: pointer; transition: transform 0.15s; user-select: none; }
 .voice-btn:hover { transform: scale(1.15); }
@@ -1077,21 +1079,29 @@ function toggleWalkieSub() {
     icon.innerHTML = ICO.speakerOff;
     // 关闭时隐藏广播条
     document.getElementById('walkie-broadcast-bar').classList.remove('show');
+    setGuestIdBroadcasting(false);
   }
 }
 
+function setGuestIdBroadcasting(on) {
+  document.querySelectorAll('.guest-id').forEach(el => {
+    if (on) el.classList.add('broadcasting'); else el.classList.remove('broadcasting');
+  });
+}
 async function playWalkieVoice(payload) {
   const bar = document.getElementById('walkie-broadcast-bar');
   try {
     bar.classList.add('show');
+    setGuestIdBroadcasting(true);
     const audio = new Audio('data:audio/mp4;base64,' + payload.audio);
     audio.volume = 0.9;
-    audio.onended = () => { bar.classList.remove('show'); };
-    audio.onerror = () => { bar.classList.remove('show'); console.error('对讲机播放失败'); };
+    audio.onended = () => { bar.classList.remove('show'); setGuestIdBroadcasting(false); };
+    audio.onerror = () => { bar.classList.remove('show'); setGuestIdBroadcasting(false); console.error('对讲机播放失败'); };
     await audio.play();
   } catch (e) {
     console.error('对讲机播放异常:', e);
     bar.classList.remove('show');
+    setGuestIdBroadcasting(false);
   }
 }
 
