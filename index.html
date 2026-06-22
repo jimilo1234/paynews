@@ -1144,7 +1144,9 @@ async function playWalkieVoice(payload) {
   try {
     bar.classList.add('show');
     setGuestIdBroadcasting(true);
-    const mime = payload.mime || 'audio/mp4';
+    // data URL不支持带codecs的MIME，只取分号前的主类型
+    const rawMime = payload.mime || 'audio/mp4';
+    const mime = rawMime.split(';')[0];
     const audio = new Audio(`data:${mime};base64,${payload.audio}`);
     audio.volume = 0.9;
     audio.onended = () => { bar.classList.remove('show'); setGuestIdBroadcasting(false); };
