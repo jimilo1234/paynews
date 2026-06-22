@@ -83,6 +83,47 @@ body {
 }
 .theme-toggle:hover { background: var(--accent); }
 html.light .theme-toggle { background: rgba(108,92,231,0.15); border-color: rgba(108,92,231,0.3); }
+
+/* 对讲机订阅开关 */
+.walkie-sub-toggle {
+  position: fixed; top: 18px; left: 16px; z-index: 200;
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(108,92,231,0.18); color: var(--text);
+  border: 1px solid rgba(108,92,231,0.3);
+  padding: 5px 10px; border-radius: 20px; font-size: 12px;
+  cursor: pointer; transition: all 0.3s; user-select: none;
+  white-space: nowrap;
+}
+.walkie-sub-toggle .toggle-track {
+  width: 30px; height: 16px; border-radius: 8px;
+  background: rgba(255,255,255,0.15); position: relative;
+  transition: background 0.3s; flex-shrink: 0;
+}
+.walkie-sub-toggle.on .toggle-track { background: var(--accent); }
+.walkie-sub-toggle .toggle-knob {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: #fff; position: absolute; top: 2px; left: 2px;
+  transition: left 0.2s;
+}
+.walkie-sub-toggle.on .toggle-knob { left: 16px; }
+html.light .walkie-sub-toggle { background: rgba(108,92,231,0.1); border-color: rgba(108,92,231,0.2); }
+
+/* 广播订阅中指示条 */
+.walkie-broadcast-bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 250;
+  background: linear-gradient(90deg, #6C5CE7, #00CEC9);
+  color: #fff; text-align: center; padding: 6px 0;
+  font-size: 13px; font-weight: 500;
+  transform: translateY(-100%); transition: transform 0.3s;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.walkie-broadcast-bar.show { transform: translateY(0); }
+.walkie-broadcast-bar .pulse-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: #fff;
+  animation: broadcast-pulse 1s infinite;
+}
+@keyframes broadcast-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.7)} }
+
 .loading-overlay.hidden { display: none; }
 
 /* 新闻区域通用 */
@@ -297,6 +338,18 @@ html.light .theme-toggle { background: rgba(108,92,231,0.15); border-color: rgba
   font-size: 14px; border: 1px solid rgba(108,92,231,0.4);
   background: rgba(108,92,231,0.15); color: var(--accent-light);
 }
+.input-side-btns .walkie-btn {
+  font-size: 0; cursor: pointer; transition: transform 0.15s; user-select: none;
+  padding: 6px 7px; border-radius: 8px; border: 1px solid var(--border-card);
+  background: var(--bg-card); color: var(--text); line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+}
+.input-side-btns .walkie-btn:hover { background: var(--bg-card-hover); transform: scale(1.05); }
+.input-side-btns .walkie-btn.ptt-active {
+  background: rgba(255,60,60,0.15); border-color: rgba(255,60,60,0.4);
+  color: #ff6b6b; animation: ptt-pulse 0.8s infinite;
+}
+@keyframes ptt-pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
 .send-row {
   display: flex; justify-content: center; margin-top: 6px;
 }
@@ -366,7 +419,19 @@ html.light .theme-toggle { background: rgba(108,92,231,0.15); border-color: rgba
     <button class="logout-btn" id="logout-btn">刷新新闻</button>
     <button class="theme-toggle" id="theme-toggle" title="切换日/夜模式"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg></button>
     <div class="page-inner" style="padding-bottom:100px;">
-      <div class="newspaper-header">
+      <!-- 对讲机订阅开关 -->
+  <div class="walkie-sub-toggle" id="walkie-sub-toggle" onclick="toggleWalkieSub()">
+    <span id="walkie-sub-icon"></span>
+    <span>对讲机</span>
+    <div class="toggle-track"><div class="toggle-knob"></div></div>
+  </div>
+  <!-- 广播订阅中 -->
+  <div class="walkie-broadcast-bar" id="walkie-broadcast-bar">
+    <div class="pulse-dot"></div>
+    <span>广播订阅中...</span>
+  </div>
+
+  <div class="newspaper-header">
         <h1>支付行业新闻</h1>
         <p class="date" id="member-news-date"></p>
         <div class="header-line"></div>
@@ -440,6 +505,8 @@ html.light .theme-toggle { background: rgba(108,92,231,0.15); border-color: rgba
           </label>
           <span class="voice-btn" id="voice-btn" title="录制语音"><span id="ico-mic"></span></span>
           <button class="refresh-btn" id="refresh-btn"><span id="ico-refresh"></span></button>
+          <span class="walkie-btn" id="walkie-btn" title="对讲机（按住说话）"
+            ><span id="ico-walkie"></span></span>
         </div>
       </div>
       <div class="send-row">
@@ -476,6 +543,9 @@ const ICO = {
   refresh: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>',
   stop: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>',
   del: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+  walkie: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/><path d="M5 4H3"/><path d="M5 8H3"/><path d="M21 4h-2"/><path d="M21 8h-2"/></svg>',
+  speaker: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 010 14.14"/><path d="M15.54 8.46a5 5 0 010 7.07"/></svg>',
+  speakerOff: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>',
 };
 
 // ===== Supabase 配置 =====
@@ -964,11 +1034,127 @@ async function doRefresh() {
   }
 }
 
+// ===== 对讲机（Push-to-Talk via Supabase Broadcast） =====
+let walkieChannel = null;
+let walkieSubscribed = false;  // 是否订阅（开关状态）
+let pttRecorder = null;
+let pttChunks = [];
+let pttActive = false;
+
+function initWalkieTalkie() {
+  if (!supabaseClient) return;
+  walkieChannel = supabaseClient.channel('walkie-talkie', {
+    config: { broadcast: { self: false } }  // 不接收自己的广播
+  });
+  walkieChannel.on('broadcast', { event: 'voice' }, (payload) => {
+    if (!walkieSubscribed) return;
+    playWalkieVoice(payload.payload);
+  });
+  walkieChannel.subscribe((status) => {
+    console.log('对讲机频道状态:', status);
+  });
+  // 初始化开关图标
+  document.getElementById('walkie-sub-icon').innerHTML = ICO.speakerOff;
+}
+
+function toggleWalkieSub() {
+  walkieSubscribed = !walkieSubscribed;
+  const toggle = document.getElementById('walkie-sub-toggle');
+  const icon = document.getElementById('walkie-sub-icon');
+  if (walkieSubscribed) {
+    toggle.classList.add('on');
+    icon.innerHTML = ICO.speaker;
+  } else {
+    toggle.classList.remove('on');
+    icon.innerHTML = ICO.speakerOff;
+    // 关闭时隐藏广播条
+    document.getElementById('walkie-broadcast-bar').classList.remove('show');
+  }
+}
+
+async function playWalkieVoice(payload) {
+  const bar = document.getElementById('walkie-broadcast-bar');
+  try {
+    bar.classList.add('show');
+    const audio = new Audio('data:audio/mp4;base64,' + payload.audio);
+    audio.volume = 0.9;
+    audio.onended = () => { bar.classList.remove('show'); };
+    audio.onerror = () => { bar.classList.remove('show'); console.error('对讲机播放失败'); };
+    await audio.play();
+  } catch (e) {
+    console.error('对讲机播放异常:', e);
+    bar.classList.remove('show');
+  }
+}
+
+function startPTT(e) {
+  e.preventDefault();
+  if (pttActive || !supabaseClient) return;
+  pttActive = true;
+  pttChunks = [];
+  const btn = document.getElementById('walkie-btn');
+  btn.classList.add('ptt-active');
+
+  // 选择录音格式
+  const mimeOptions = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg'];
+  let selectedMime = '';
+  for (const m of mimeOptions) {
+    if (MediaRecorder.isTypeSupported(m)) { selectedMime = m; break; }
+  }
+  if (!selectedMime) { pttActive = false; btn.classList.remove('ptt-active'); alert('浏览器不支持录音'); return; }
+
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+    pttRecorder = new MediaRecorder(stream, { mimeType: selectedMime });
+    pttRecorder.ondataavailable = (ev) => { if (ev.data.size > 0) pttChunks.push(ev.data); };
+    pttRecorder.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      const blob = new Blob(pttChunks, { type: selectedMime });
+      // 转base64并发送
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = reader.result.split(',')[1];
+        if (base64 && walkieChannel) {
+          walkieChannel.send({
+            type: 'broadcast',
+            event: 'voice',
+            payload: { audio: base64, from: currentUser?.display_name || '匿名' }
+          });
+        }
+      };
+      reader.readAsDataURL(blob);
+      btn.classList.remove('ptt-active');
+      pttActive = false;
+    };
+    pttRecorder.start();
+  }).catch(err => {
+    console.error('麦克风获取失败:', err);
+    btn.classList.remove('ptt-active');
+    pttActive = false;
+  });
+}
+
+function stopPTT(e) {
+  e.preventDefault();
+  if (pttRecorder && pttRecorder.state === 'recording') {
+    pttRecorder.stop();
+  }
+}
+
 // ===== 初始化 =====
 document.addEventListener('DOMContentLoaded', async () => {
   // 注入SVG图标
-  const icoMap = {'ico-img': ICO.img, 'ico-mic': ICO.mic, 'ico-refresh': ICO.refresh, 'ico-del': ICO.del};
+  const icoMap = {'ico-img': ICO.img, 'ico-mic': ICO.mic, 'ico-refresh': ICO.refresh, 'ico-del': ICO.del, 'ico-walkie': ICO.walkie};
   Object.entries(icoMap).forEach(([id, svg]) => { const el = document.getElementById(id); if (el) el.innerHTML = svg; });
+
+  // 对讲机事件绑定
+  const wBtn = document.getElementById('walkie-btn');
+  wBtn.addEventListener('mousedown', startPTT);
+  wBtn.addEventListener('mouseup', stopPTT);
+  wBtn.addEventListener('mouseleave', stopPTT);
+  wBtn.addEventListener('touchstart', startPTT, { passive: false });
+  wBtn.addEventListener('touchend', stopPTT, { passive: false });
+  wBtn.addEventListener('touchcancel', stopPTT, { passive: false });
+  initWalkieTalkie();
 
   // 隐藏加载层
   const overlay = document.getElementById('loading-overlay');
