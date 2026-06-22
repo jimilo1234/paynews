@@ -310,15 +310,24 @@ html.light .walkie-sub-toggle { background: rgba(108,92,231,0.1); border-color: 
   background: var(--bg-bar); backdrop-filter: blur(12px);
   border-top: 1px solid var(--border-card); padding: 10px 12px; z-index: 100;
 }
-.input-row { display: flex; gap: 6px; align-items: flex-end; max-width: 600px; margin: 0 auto; }
-.input-row textarea {
-  flex: 1; padding: 10px 12px; border-radius: 12px;
+.input-row { display: flex; gap: 6px; align-items: stretch; max-width: 600px; margin: 0 auto; }
+.input-col { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.input-col textarea {
+  flex: 1; padding: 8px 12px; border-radius: 10px;
   border: 1px solid var(--border-input); background: var(--bg-input);
   color: var(--text); font-size: 14px; outline: none; transition: border 0.2s;
-  resize: none; min-height: 60px; max-height: 90px; line-height: 1.5;
+  resize: none; min-height: 0; max-height: none; line-height: 1.5;
   font-family: inherit;
 }
-.input-row textarea:focus { border-color: var(--accent); }
+.input-col textarea:focus { border-color: var(--accent); }
+.input-col .send-btn {
+  width: 100%; padding: 6px; border: none; border-radius: 10px;
+  background: var(--accent); color: #fff; font-size: 13px;
+  font-weight: 600; cursor: pointer; transition: background 0.2s;
+  white-space: nowrap; flex-shrink: 0;
+}
+.input-col .send-btn:hover { background: #7c6cf7; }
+.input-col .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .input-side-btns {
   display: flex; flex-direction: column; gap: 4px; align-items: center;
   padding: 2px 0;
@@ -350,17 +359,7 @@ html.light .walkie-sub-toggle { background: rgba(108,92,231,0.1); border-color: 
   color: #ff6b6b; animation: ptt-pulse 0.8s infinite;
 }
 @keyframes ptt-pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
-.send-row {
-  display: flex; justify-content: center; margin-top: 6px;
-}
-.send-btn {
-  width: 100%; max-width: 600px; padding: 10px; border: none; border-radius: 12px;
-  background: var(--accent); color: #fff; font-size: 14px;
-  font-weight: 600; cursor: pointer; transition: background 0.2s;
-  white-space: nowrap;
-}
-.send-btn:hover { background: #7c6cf7; }
-.send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
 .preview-area { max-width: 600px; margin: 4px auto 0; }
 .preview-area img { max-height: 60px; border-radius: 6px; border: 1px solid var(--border-card); }
 
@@ -497,7 +496,10 @@ html.light .walkie-sub-toggle { background: rgba(108,92,231,0.1); border-color: 
 
     <div class="message-input-area">
       <div class="input-row">
-        <textarea id="msg-text" placeholder="写点什么..." maxlength="200" rows="3"></textarea>
+        <div class="input-col">
+          <textarea id="msg-text" placeholder="写点什么..." maxlength="200" rows="2"></textarea>
+          <button class="send-btn" id="send-btn">发布新闻</button>
+        </div>
         <div class="input-side-btns">
           <label class="img-upload-btn" title="上传图片">
             <span id="ico-img"></span>
@@ -509,9 +511,7 @@ html.light .walkie-sub-toggle { background: rgba(108,92,231,0.1); border-color: 
             ><span id="ico-walkie"></span></span>
         </div>
       </div>
-      <div class="send-row">
-        <button class="send-btn" id="send-btn">发布新闻</button>
-      </div>
+
       <div class="recording-bar" id="recording-bar">
         <span class="rec-dot"></span>
         <span id="rec-timer">0:00</span>
