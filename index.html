@@ -266,28 +266,32 @@ html.light .theme-toggle { background: rgba(108,92,231,0.15); border-color: rgba
 .message-input-area {
   position: fixed; bottom: 0; left: 0; right: 0;
   background: var(--bg-bar); backdrop-filter: blur(12px);
-  border-top: 1px solid var(--border-card); padding: 12px 20px; z-index: 100;
+  border-top: 1px solid var(--border-card); padding: 10px 12px; z-index: 100;
 }
-.input-row { display: flex; gap: 8px; align-items: center; max-width: 800px; margin: 0 auto; }
-.input-row input[type="text"] {
-  flex: 1; padding: 10px 14px; border-radius: 20px;
+.input-row { display: flex; gap: 6px; align-items: flex-end; max-width: 600px; margin: 0 auto; }
+.input-row textarea {
+  flex: 1; padding: 10px 12px; border-radius: 12px;
   border: 1px solid var(--border-input); background: var(--bg-input);
   color: var(--text); font-size: 14px; outline: none; transition: border 0.2s;
+  resize: none; min-height: 60px; max-height: 90px; line-height: 1.5;
+  font-family: inherit;
 }
-.input-row input[type="text"]:focus { border-color: var(--accent); }
-.img-upload-btn { font-size: 22px; cursor: pointer; transition: transform 0.15s; user-select: none; }
-.img-upload-btn:hover { transform: scale(1.15); }
+.input-row textarea:focus { border-color: var(--accent); }
+.img-upload-btn { font-size: 18px; cursor: pointer; transition: transform 0.15s; user-select: none; }
+.img-upload-btn:hover { transform: scale(1.1); }
 .send-btn {
-  padding: 8px 20px; border: none; border-radius: 20px;
-  background: var(--accent); color: #fff; font-size: 13px;
+  padding: 8px 14px; border: none; border-radius: 12px;
+  background: var(--accent); color: #fff; font-size: 12px;
   font-weight: 600; cursor: pointer; transition: background 0.2s;
+  white-space: nowrap;
 }
 .send-btn:hover { background: #7c6cf7; }
 .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .refresh-btn {
-  padding: 8px 16px; border: 1px solid rgba(108,92,231,0.4); border-radius: 20px;
-  background: rgba(108,92,231,0.15); color: var(--accent-light); font-size: 13px;
+  padding: 8px 10px; border: 1px solid rgba(108,92,231,0.4); border-radius: 12px;
+  background: rgba(108,92,231,0.15); color: var(--accent-light); font-size: 12px;
   font-weight: 600; cursor: pointer; transition: all 0.2s;
+  white-space: nowrap;
 }
 .refresh-btn:hover { background: rgba(108,92,231,0.3); }
 .refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -348,7 +352,7 @@ html.light .theme-toggle { background: rgba(108,92,231,0.15); border-color: rgba
   <div id="member-page" class="page">
     <button class="logout-btn" id="logout-btn">刷新新闻</button>
     <button class="theme-toggle" id="theme-toggle" title="切换日/夜模式">🌙</button>
-    <div class="page-inner" style="padding-bottom:80px;">
+    <div class="page-inner" style="padding-bottom:100px;">
       <div class="newspaper-header">
         <h1>支付行业新闻</h1>
         <p class="date" id="member-news-date"></p>
@@ -415,13 +419,13 @@ html.light .theme-toggle { background: rgba(108,92,231,0.15); border-color: rgba
 
     <div class="message-input-area">
       <div class="input-row">
-        <input type="text" id="msg-text" placeholder="写点什么..." maxlength="200">
+        <textarea id="msg-text" placeholder="写点什么..." maxlength="200" rows="3"></textarea>
         <label class="img-upload-btn" title="上传图片">
           📷
           <input type="file" id="msg-image" accept="image/*" hidden>
         </label>
-        <span class="voice-btn" id="voice-btn" title="录制语音">📢</span>
-        <button class="refresh-btn" id="refresh-btn">🔄 刷新</button>
+        <span class="voice-btn" id="voice-btn" title="录制语音" style="font-size:18px;">📢</span>
+        <button class="refresh-btn" id="refresh-btn">🔄</button>
         <button class="send-btn" id="send-btn">发布新闻</button>
       </div>
       <div class="recording-bar" id="recording-bar">
@@ -916,7 +920,7 @@ async function doRefresh() {
   if (!currentUser) return;
   const refreshBtn = document.getElementById('refresh-btn');
   refreshBtn.disabled = true;
-  refreshBtn.textContent = '刷新中...';
+  refreshBtn.textContent = '⏳';
   try {
     const messages = await fetchMessages();
     hasNewMessages = false;  // 手动刷新恢复颜色
@@ -928,7 +932,7 @@ async function doRefresh() {
     console.error('刷新失败:', err);
   } finally {
     refreshBtn.disabled = false;
-    refreshBtn.textContent = '🔄 刷新';
+    refreshBtn.textContent = '🔄';
   }
 }
 
