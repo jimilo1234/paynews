@@ -1200,11 +1200,15 @@ function startPTT(e) {
       reader.onloadend = () => {
         const base64 = reader.result.split(',')[1];
         if (base64 && walkieChannel) {
-          walkieChannel.send({
-            type: 'broadcast',
-            event: 'voice',
-            payload: { audio: base64, mime: selectedMime, from: currentUser?.display_name || '匿名' }
-          });
+          try {
+            walkieChannel.send({
+              type: 'broadcast',
+              event: 'voice',
+              payload: { audio: base64, mime: selectedMime, from: currentUser?.display_name || '匿名' }
+            });
+          } catch (sendErr) {
+            console.error('对讲机发送失败:', sendErr);
+          }
         }
       };
       reader.readAsDataURL(blob);
