@@ -932,6 +932,8 @@ async function doLogin() {
     document.getElementById('public-page').classList.remove('active');
     document.getElementById('member-page').classList.add('active');
     renderNews('member-news-grid', 'member-news-date', messages);
+    // 登录后重新初始化对讲机（用正确的用户名作为Presence key）
+    initWalkieTalkie();
 
   } catch (err) {
     console.error('登录失败:', err);
@@ -1060,8 +1062,14 @@ let pttActive = false;
 
 function initWalkieTalkie() {
   if (!supabaseClient) return;
+  // 如果已有旧频道（登录前用anon创建的），先销毁
+  if (walkieChannel) {
+    try { supabaseClient.removeChannel(walkieChannel); } catch(e) {}
+    walkieChannel = null;
+  }
+  const presenceKey = currentUser ? currentUser.username : 'anon';
   walkieChannel = supabaseClient.channel('walkie-talkie', {
-    config: { broadcast: { self: false }, presence: { key: currentUser ? currentUser.username : 'anon' } }
+    config: { broadcast: { self: false }, presence: { key: presenceKey } }
   });
   walkieChannel.on('broadcast', { event: 'voice' }, (payload) => {
     if (!walkieSubscribed) return;
