@@ -1144,7 +1144,8 @@ async function playWalkieVoice(payload) {
   try {
     bar.classList.add('show');
     setGuestIdBroadcasting(true);
-    const audio = new Audio('data:audio/mp4;base64,' + payload.audio);
+    const mime = payload.mime || 'audio/mp4';
+    const audio = new Audio(`data:${mime};base64,${payload.audio}`);
     audio.volume = 0.9;
     audio.onended = () => { bar.classList.remove('show'); setGuestIdBroadcasting(false); };
     audio.onerror = () => { bar.classList.remove('show'); setGuestIdBroadcasting(false); console.error('对讲机播放失败'); };
@@ -1158,7 +1159,7 @@ async function playWalkieVoice(payload) {
 
 function startPTT(e) {
   e.preventDefault();
-  if (pttActive || !supabaseClient) return;
+  if (pttActive || !supabaseClient || !walkieChannel) return;
   pttActive = true;
   pttChunks = [];
   const btn = document.getElementById('walkie-btn');
@@ -1186,7 +1187,7 @@ function startPTT(e) {
           walkieChannel.send({
             type: 'broadcast',
             event: 'voice',
-            payload: { audio: base64, from: currentUser?.display_name || '匿名' }
+            payload: { audio: base64, mime: selectedMime, from: currentUser?.display_name || '匿名' }
           });
         }
       };
