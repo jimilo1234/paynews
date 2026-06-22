@@ -1055,44 +1055,48 @@ async function doRefresh() {
 
 // ===== 对讲机（Push-to-Talk via Supabase Broadcast） =====
 let walkieChannel = null;
+let presenceChannel = null;  // 独立的Presence频道追踪在线订阅状态
 let walkieSubscribed = false;  // 是否订阅（开关状态）
 let pttRecorder = null;
 let pttChunks = [];
 let pttActive = false;
 
 function initWalkieTalkie() {
-  if (!supabaseClient) return;
-  // 如果已有旧频道（登录前用anon创建的），先销毁
-  if (walkieChannel) {
-    try { supabaseClient.removeChannel(walkieChannel); } catch(e) {}
-    walkieChannel = null;
-  }
-  const presenceKey = currentUser ? currentUser.username : 'anon';
+  if (!supabaseClient || !currentUser) return;
+  // 对讲机频道：只负责语音广播
+  if (walkieChannel) { try { supabaseClient.removeChannel(walkieChannel); } catch(e) {} }
   walkieChannel = supabaseClient.channel('walkie-talkie', {
-    config: { broadcast: { self: false }, presence: { key: presenceKey } }
+    config: { broadcast: { self: false } }
   });
   walkieChannel.on('broadcast', { event: 'voice' }, (payload) => {
     if (!walkieSubscribed) return;
     playWalkieVoice(payload.payload);
   });
-  // 在线状态追踪：监听 Presence 同步
-  walkieChannel.on('presence', { event: 'sync' }, () => {
-    const newState = walkieChannel.presenceState();
+  walkieChannel.subscribe((status) => {
+    console.log('对讲机频道状态:', status);
+  });
+  // 在线状态频道：独立Presence追踪
+  if (presenceChannel) { try { supabaseClient.removeChannel(presenceChannel); } catch(e) {} }
+  presenceChannel = supabaseClient.channel('online-presence', {
+    config: { presence: { key: currentUser.username } }
+  });
+  presenceChannel.on('presence', { event: 'sync' }, () => {
+    const state = presenceChannel.presenceState();
     onlineSubscribers = {};
-    for (const key in newState) {
-      // 每个key下可能有多个presence，取最新的订阅状态
-      const presences = newState[key];
+    for (const key in state) {
+      const presences = state[key];
       if (presences && presences.length > 0) {
         const latest = presences[presences.length - 1];
         if (latest.walkieSub) onlineSubscribers[key] = true;
       }
     }
+    console.log('在线订阅者:', JSON.stringify(onlineSubscribers));
     updateAllCopyIcons();
   });
-  walkieChannel.subscribe(async (status) => {
-    console.log('对讲机频道状态:', status);
-    if (status === 'SUBSCRIBED' && currentUser) {
-      await walkieChannel.track({ walkieSub: walkieSubscribed, online: true });
+  presenceChannel.subscribe(async (status) => {
+    console.log('Presence频道状态:', status);
+    if (status === 'SUBSCRIBED') {
+      await presenceChannel.track({ walkieSub: walkieSubscribed, online: true });
     }
   });
   // 初始化开关图标
@@ -1114,8 +1118,8 @@ function toggleWalkieSub() {
     setGuestIdBroadcasting(false);
   }
   // 更新Presence状态
-  if (walkieChannel && currentUser) {
-    walkieChannel.track({ walkieSub: walkieSubscribed, online: true });
+  if (presenceChannel) {
+    presenceChannel.track({ walkieSub: walkieSubscribed, online: true });
   }
 }
 
@@ -1223,7 +1227,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   wBtn.addEventListener('touchstart', startPTT, { passive: false });
   wBtn.addEventListener('touchend', stopPTT, { passive: false });
   wBtn.addEventListener('touchcancel', stopPTT, { passive: false });
-  initWalkieTalkie();
+  // 对讲机频道在登录后初始化，此处不调用initWalkieTalkie
 
   // 隐藏加载层
   const overlay = document.getElementById('loading-overlay');
