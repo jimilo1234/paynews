@@ -549,7 +549,7 @@ function renderNews(containerId, dateId, userMessages, isAutoRefresh) {
     }
     if (summaryContent) msgHtml += `<p>${summaryContent}</p>`;
     if (newestMsg.image_url) msgHtml += `<span class="img-toggle" onclick="toggleImg(this)">📷 查看图片</span><div class="img-fold"><img src="${newestMsg.image_url}" alt="配图" onclick="showOverlay(this.src)"></div>`;
-    if (newestMsg.audio_url) msgHtml += `<audio controls src="${newestMsg.audio_url}" preload="metadata"></audio>`;
+    if (newestMsg.audio_url) msgHtml += `<audio controls src="${newestMsg.audio_url}" preload="metadata">您的浏览器不支持语音播放</audio>`;
     // 爱心复制按钮
     const copyText = newestMsg.text || '';
     msgHtml += `<span class="copy-heart" onclick="copyComment(this, '${escapeHtml(copyText).replace(/'/g, "\\'")}')" title="复制评论">♡</span>`;
@@ -720,16 +720,14 @@ let recSeconds = 0;
 async function startRecording() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    // 选择浏览器支持的 mimeType
+    // 选择浏览器支持的 mimeType（优先m4a兼容Safari/iOS）
     let mimeType = 'audio/webm';
-    if (!MediaRecorder.isTypeSupported(mimeType)) {
-      mimeType = 'audio/webm;codecs=opus';
-    }
-    if (!MediaRecorder.isTypeSupported(mimeType)) {
-      mimeType = 'audio/ogg;codecs=opus';
-    }
-    if (!MediaRecorder.isTypeSupported(mimeType)) {
+    if (MediaRecorder.isTypeSupported('audio/mp4')) {
       mimeType = 'audio/mp4';
+    } else if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+      mimeType = 'audio/webm;codecs=opus';
+    } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
+      mimeType = 'audio/ogg;codecs=opus';
     }
     mediaRecorder = new MediaRecorder(stream, { mimeType });
     recChunks = [];
@@ -1070,7 +1068,7 @@ function gkRenderNews(messages) {
     }
     if (summaryContent) msgHtml += `<p>${summaryContent}</p>`;
     if (newestMsg.image_url) msgHtml += `<span class="img-toggle" onclick="toggleImg(this)">📷 查看图片</span><div class="img-fold"><img src="${newestMsg.image_url}" alt="配图" onclick="showOverlay(this.src)"></div>`;
-    if (newestMsg.audio_url) msgHtml += `<audio controls src="${newestMsg.audio_url}" preload="metadata"></audio>`;
+    if (newestMsg.audio_url) msgHtml += `<audio controls src="${newestMsg.audio_url}" preload="metadata">您的浏览器不支持语音播放</audio>`;
     const copyText = newestMsg.text || '';
     msgHtml += `<span class="copy-heart" onclick="copyComment(this, '${escapeHtml(copyText).replace(/'/g, "\\'")}')" title="复制评论">♡</span>`;
     msgHtml += `</div>`;
@@ -1097,6 +1095,7 @@ async function gkCleanup() {
 }
 
 // 清理Storage中的图片和语音文件，同时置空messages中的媒体链接
+// 注意：语音文件由本函数管理生命周期，不置空audio_url（避免播放器消失）
 async function cleanupStorage() {
   if (!supabaseClient) return;
   try {
@@ -1104,17 +1103,38 @@ async function cleanupStorage() {
     const { data: files, error } = await supabaseClient.storage.from('images').list('', { limit: 100 });
     if (error) { console.warn('列出存储文件失败:', error); return; }
     if (files && files.length > 0) {
-      const filePaths = files.map(f => f.name);
-      const { error: delErr } = await supabaseClient.storage.from('images').remove(filePaths);
-      if (delErr) console.warn('删除存储文件失败:', delErr);
-      else console.log(`已清理 ${filePaths.length} 个存储文件`);
+      // 分离图片和语音文件
+      const imageFiles = files.filter(f => !f.name.startsWith('shared_voice'));
+      const voiceFiles = files.filter(f => f.name.startsWith('shared_voice'));
+      
+      // 删除图片文件
+      if (imageFiles.length > 0) {
+        const imagePaths = imageFiles.map(f => f.name);
+        const { error: delErr } = await supabaseClient.storage.from('images').remove(imagePaths);
+        if (delErr) console.warn('删除图片文件失败:', delErr);
+        else console.log(`已清理 ${imagePaths.length} 个图片文件`);
+      }
+      
+      // 语音文件：只删除超过2小时的旧语音（给播放留足时间）
+      const twoHoursAgo = Date.now() - 2 * 3600000;
+      const oldVoiceFiles = voiceFiles.filter(f => new Date(f.created_at).getTime() < twoHoursAgo);
+      if (oldVoiceFiles.length > 0) {
+        const voicePaths = oldVoiceFiles.map(f => f.name);
+        await supabaseClient.storage.from('images').remove(voicePaths);
+        // 旧语音删除后，置空对应的audio_url
+        const { error: msgErr } = await supabaseClient
+          .from('messages')
+          .update({ audio_url: null })
+          .not('audio_url', 'is', null);
+        if (msgErr) console.warn('清理语音链接失败:', msgErr);
+      }
     }
-    // 置空messages中的image_url和audio_url
+    // 只置空image_url（图片已删除），保留audio_url直到语音文件过期
     const { error: msgErr } = await supabaseClient
       .from('messages')
-      .update({ image_url: null, audio_url: null })
+      .update({ image_url: null })
       .not('image_url', 'is', null);
-    if (msgErr) console.warn('清理消息媒体链接失败:', msgErr);
+    if (msgErr) console.warn('清理消息图片链接失败:', msgErr);
   } catch (e) {
     console.warn('Storage清理异常:', e);
   }
