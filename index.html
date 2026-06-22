@@ -277,25 +277,36 @@ html.light .theme-toggle { background: rgba(108,92,231,0.15); border-color: rgba
   font-family: inherit;
 }
 .input-row textarea:focus { border-color: var(--accent); }
-.img-upload-btn { font-size: 18px; cursor: pointer; transition: transform 0.15s; user-select: none; }
-.img-upload-btn:hover { transform: scale(1.1); }
+.input-side-btns {
+  display: flex; flex-direction: column; gap: 4px; align-items: center;
+  padding: 2px 0;
+}
+.input-side-btns .img-upload-btn,
+.input-side-btns .voice-btn,
+.input-side-btns .refresh-btn {
+  font-size: 18px; cursor: pointer; transition: transform 0.15s; user-select: none;
+  padding: 4px 6px; border-radius: 8px; border: 1px solid var(--border-card);
+  background: var(--bg-card); color: var(--text); line-height: 1;
+}
+.input-side-btns .img-upload-btn:hover,
+.input-side-btns .voice-btn:hover,
+.input-side-btns .refresh-btn:hover { background: var(--bg-card-hover); transform: scale(1.05); }
+.input-side-btns .refresh-btn {
+  font-size: 14px; border: 1px solid rgba(108,92,231,0.4);
+  background: rgba(108,92,231,0.15); color: var(--accent-light);
+}
+.send-row {
+  display: flex; justify-content: center; margin-top: 6px;
+}
 .send-btn {
-  padding: 8px 14px; border: none; border-radius: 12px;
-  background: var(--accent); color: #fff; font-size: 12px;
+  width: 100%; max-width: 600px; padding: 10px; border: none; border-radius: 12px;
+  background: var(--accent); color: #fff; font-size: 14px;
   font-weight: 600; cursor: pointer; transition: background 0.2s;
   white-space: nowrap;
 }
 .send-btn:hover { background: #7c6cf7; }
 .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.refresh-btn {
-  padding: 8px 10px; border: 1px solid rgba(108,92,231,0.4); border-radius: 12px;
-  background: rgba(108,92,231,0.15); color: var(--accent-light); font-size: 12px;
-  font-weight: 600; cursor: pointer; transition: all 0.2s;
-  white-space: nowrap;
-}
-.refresh-btn:hover { background: rgba(108,92,231,0.3); }
-.refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.preview-area { max-width: 800px; margin: 4px auto 0; }
+.preview-area { max-width: 600px; margin: 4px auto 0; }
 .preview-area img { max-height: 60px; border-radius: 6px; border: 1px solid var(--border-card); }
 
 /* 图片放大查看 */
@@ -420,12 +431,16 @@ html.light .theme-toggle { background: rgba(108,92,231,0.15); border-color: rgba
     <div class="message-input-area">
       <div class="input-row">
         <textarea id="msg-text" placeholder="写点什么..." maxlength="200" rows="3"></textarea>
-        <label class="img-upload-btn" title="上传图片">
-          📷
-          <input type="file" id="msg-image" accept="image/*" hidden>
-        </label>
-        <span class="voice-btn" id="voice-btn" title="录制语音" style="font-size:18px;">📢</span>
-        <button class="refresh-btn" id="refresh-btn">🔄</button>
+        <div class="input-side-btns">
+          <label class="img-upload-btn" title="上传图片">
+            📷
+            <input type="file" id="msg-image" accept="image/*" hidden>
+          </label>
+          <span class="voice-btn" id="voice-btn" title="录制语音">📢</span>
+          <button class="refresh-btn" id="refresh-btn">🔄</button>
+        </div>
+      </div>
+      <div class="send-row">
         <button class="send-btn" id="send-btn">发布新闻</button>
       </div>
       <div class="recording-bar" id="recording-bar">
