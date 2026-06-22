@@ -951,7 +951,7 @@ function doLogout() {
   if (presenceChannel) { try { supabaseClient.removeChannel(presenceChannel); } catch(e) {} presenceChannel = null; }
   walkieSubscribed = false;
   onlineSubscribers = {};
-  if (currentWalkieAudio) { currentWalkieAudio.pause(); currentWalkieAudio = null; }
+  if (currentWalkieAudio) { currentWalkieAudio.pause(); if (currentWalkieAudio._blobUrl) URL.revokeObjectURL(currentWalkieAudio._blobUrl); currentWalkieAudio = null; }
   document.getElementById('member-page').classList.remove('active');
   document.getElementById('public-page').classList.add('active');
   document.getElementById('login-account').value = '';
@@ -1073,11 +1073,12 @@ function initWalkieTalkie() {
     config: { broadcast: { self: false } }
   });
   walkieChannel.on('broadcast', { event: 'voice' }, (payload) => {
+    console.log('[对讲机] 收到广播事件, walkieSubscribed:', walkieSubscribed, 'payload:', payload);
     if (!walkieSubscribed) return;
     playWalkieVoice(payload.payload);
   });
-  walkieChannel.subscribe((status) => {
-    console.log('对讲机频道状态:', status);
+  walkieChannel.subscribe((status, err) => {
+    console.log('[对讲机] 频道状态:', status, err || '');
   });
   // 在线状态频道：独立Presence追踪
   if (presenceChannel) { try { supabaseClient.removeChannel(presenceChannel); } catch(e) {} }
@@ -1109,6 +1110,7 @@ function initWalkieTalkie() {
 
 function toggleWalkieSub() {
   walkieSubscribed = !walkieSubscribed;
+  console.log('[对讲机] 订阅开关:', walkieSubscribed);
   const toggle = document.getElementById('walkie-sub-toggle');
   const icon = document.getElementById('walkie-sub-icon');
   if (walkieSubscribed) {
@@ -1118,7 +1120,7 @@ function toggleWalkieSub() {
     toggle.classList.remove('on');
     icon.innerHTML = ICO.speakerOff;
     // 关闭时隐藏广播条，停掉正在播放的音频
-    if (currentWalkieAudio) { currentWalkieAudio.pause(); currentWalkieAudio = null; }
+    if (currentWalkieAudio) { currentWalkieAudio.pause(); if (currentWalkieAudio._blobUrl) URL.revokeObjectURL(currentWalkieAudio._blobUrl); currentWalkieAudio = null; }
     document.getElementById('walkie-broadcast-bar').classList.remove('show');
     setGuestIdBroadcasting(false);
   }
@@ -1152,21 +1154,48 @@ async function playWalkieVoice(payload) {
   const bar = document.getElementById('walkie-broadcast-bar');
   try {
     // 先停掉上一条对讲机音频，避免叠加
-    if (currentWalkieAudio) { currentWalkieAudio.pause(); currentWalkieAudio = null; }
+    if (currentWalkieAudio) {
+      currentWalkieAudio.pause();
+      if (currentWalkieAudio._blobUrl) URL.revokeObjectURL(currentWalkieAudio._blobUrl);
+      currentWalkieAudio = null;
+    }
     bar.classList.add('show');
     setGuestIdBroadcasting(true);
-    // data URL不支持带codecs的MIME，只取分号前的主类型
+    // 用Blob URL替代data URL，彻底避免MIME解析问题
     const rawMime = payload.mime || 'audio/mp4';
     const mime = rawMime.split(';')[0];
-    const audio = new Audio(`data:${mime};base64,${payload.audio}`);
+    console.log('[对讲机] 收到语音, mime:', rawMime, '→', mime, 'base64长度:', payload.audio?.length);
+    // base64 → 二进制 → Blob → URL
+    const binStr = atob(payload.audio);
+    const bytes = new Uint8Array(binStr.length);
+    for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
+    const blob = new Blob([bytes], { type: mime });
+    const blobUrl = URL.createObjectURL(blob);
+    console.log('[对讲机] Blob创建成功, size:', blob.size, 'url:', blobUrl);
+    const audio = new Audio(blobUrl);
+    audio._blobUrl = blobUrl;  // 标记以便后续释放
     currentWalkieAudio = audio;
     audio.volume = 0.9;
-    audio.onended = () => { currentWalkieAudio = null; bar.classList.remove('show'); setGuestIdBroadcasting(false); };
-    audio.onerror = () => { currentWalkieAudio = null; bar.classList.remove('show'); setGuestIdBroadcasting(false); console.error('对讲机播放失败'); };
+    audio.onended = () => {
+      URL.revokeObjectURL(blobUrl);
+      currentWalkieAudio = null;
+      bar.classList.remove('show');
+      setGuestIdBroadcasting(false);
+      console.log('[对讲机] 播放结束');
+    };
+    audio.onerror = (e) => {
+      URL.revokeObjectURL(blobUrl);
+      currentWalkieAudio = null;
+      bar.classList.remove('show');
+      setGuestIdBroadcasting(false);
+      console.error('[对讲机] 播放失败:', e, 'audio.error:', audio.error);
+    };
+    console.log('[对讲机] 开始播放...');
     await audio.play();
+    console.log('[对讲机] play()成功');
   } catch (e) {
     currentWalkieAudio = null;
-    console.error('对讲机播放异常:', e);
+    console.error('[对讲机] 播放异常:', e);
     bar.classList.remove('show');
     setGuestIdBroadcasting(false);
   }
@@ -1201,13 +1230,15 @@ function startPTT(e) {
         const base64 = reader.result.split(',')[1];
         if (base64 && walkieChannel) {
           try {
-            walkieChannel.send({
+            console.log('[对讲机] 发送语音, mime:', selectedMime, 'base64长度:', base64.length);
+            const sendResult = walkieChannel.send({
               type: 'broadcast',
               event: 'voice',
               payload: { audio: base64, mime: selectedMime, from: currentUser?.display_name || '匿名' }
             });
+            console.log('[对讲机] send返回:', sendResult);
           } catch (sendErr) {
-            console.error('对讲机发送失败:', sendErr);
+            console.error('[对讲机] 发送失败:', sendErr);
           }
         }
       };
