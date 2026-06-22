@@ -77,8 +77,9 @@ body {
   position: fixed; top: 18px; right: 120px; z-index: 200;
   background: rgba(108,92,231,0.25); color: #fff;
   border: 1px solid rgba(108,92,231,0.4);
-  padding: 8px 16px; border-radius: 20px; font-size: 16px;
+  padding: 6px 10px; border-radius: 20px; font-size: 0;
   cursor: pointer; transition: all 0.3s; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
 }
 .theme-toggle:hover { background: var(--accent); }
 html.light .theme-toggle { background: rgba(108,92,231,0.15); border-color: rgba(108,92,231,0.3); }
@@ -284,9 +285,10 @@ html.light .theme-toggle { background: rgba(108,92,231,0.15); border-color: rgba
 .input-side-btns .img-upload-btn,
 .input-side-btns .voice-btn,
 .input-side-btns .refresh-btn {
-  font-size: 18px; cursor: pointer; transition: transform 0.15s; user-select: none;
-  padding: 4px 6px; border-radius: 8px; border: 1px solid var(--border-card);
+  font-size: 0; cursor: pointer; transition: transform 0.15s; user-select: none;
+  padding: 6px 7px; border-radius: 8px; border: 1px solid var(--border-card);
   background: var(--bg-card); color: var(--text); line-height: 1;
+  display: flex; align-items: center; justify-content: center;
 }
 .input-side-btns .img-upload-btn:hover,
 .input-side-btns .voice-btn:hover,
@@ -362,7 +364,7 @@ html.light .theme-toggle { background: rgba(108,92,231,0.15); border-color: rgba
   <!-- 页面2：登录后 -->
   <div id="member-page" class="page">
     <button class="logout-btn" id="logout-btn">刷新新闻</button>
-    <button class="theme-toggle" id="theme-toggle" title="切换日/夜模式">🌙</button>
+    <button class="theme-toggle" id="theme-toggle" title="切换日/夜模式"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg></button>
     <div class="page-inner" style="padding-bottom:100px;">
       <div class="newspaper-header">
         <h1>支付行业新闻</h1>
@@ -433,11 +435,11 @@ html.light .theme-toggle { background: rgba(108,92,231,0.15); border-color: rgba
         <textarea id="msg-text" placeholder="写点什么..." maxlength="200" rows="3"></textarea>
         <div class="input-side-btns">
           <label class="img-upload-btn" title="上传图片">
-            📷
+            <span id="ico-img"></span>
             <input type="file" id="msg-image" accept="image/*" hidden>
           </label>
-          <span class="voice-btn" id="voice-btn" title="录制语音">📢</span>
-          <button class="refresh-btn" id="refresh-btn">🔄</button>
+          <span class="voice-btn" id="voice-btn" title="录制语音"><span id="ico-mic"></span></span>
+          <button class="refresh-btn" id="refresh-btn"><span id="ico-refresh"></span></button>
         </div>
       </div>
       <div class="send-row">
@@ -446,11 +448,11 @@ html.light .theme-toggle { background: rgba(108,92,231,0.15); border-color: rgba
       <div class="recording-bar" id="recording-bar">
         <span class="rec-dot"></span>
         <span id="rec-timer">0:00</span>
-        <span class="rec-stop" id="rec-stop">⏹ 停止</span>
+        <span class="rec-stop" id="rec-stop"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px"><rect x="4" y="4" width="16" height="16" rx="2"/></svg> 停止</span>
       </div>
       <div class="voice-preview" id="voice-preview">
-        🎤 语音已录制 <span id="voice-dur"></span>
-        <span class="voice-del" id="voice-del">✕</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="9" y="1" width="6" height="12" rx="3"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg> 语音已录制 <span id="voice-dur"></span>
+        <span class="voice-del" id="voice-del"><span id="ico-del"></span></span>
       </div>
       <div class="preview-area" id="preview-area"></div>
     </div>
@@ -465,6 +467,17 @@ html.light .theme-toggle { background: rgba(108,92,231,0.15); border-color: rgba
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <script>
+// ===== SVG 图标（简约商务线条风） =====
+const ICO = {
+  moon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>',
+  sun: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>',
+  img: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>',
+  mic: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="1" width="6" height="12" rx="3"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>',
+  refresh: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>',
+  stop: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>',
+  del: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+};
+
 // ===== Supabase 配置 =====
 const SUPABASE_URL = 'https://wwxzycfdfyyljkjfcbjt.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_0WePrzUk-LVH3TK7RFT_fQ_5r3C0dvP';
@@ -567,7 +580,7 @@ function renderNews(containerId, dateId, userMessages, isAutoRefresh) {
       summaryContent += `<span style="color:var(--text-dim);font-size:13px;"> ${escapeHtml(olderMsg.text)}</span>`;
     }
     if (summaryContent) msgHtml += `<p>${summaryContent}</p>`;
-    if (newestMsg.image_url) msgHtml += `<span class="img-toggle" onclick="toggleImg(this)">📷 查看图片</span><div class="img-fold"><img src="${newestMsg.image_url}" alt="配图" onclick="showOverlay(this.src)"></div>`;
+    if (newestMsg.image_url) msgHtml += `<span class="img-toggle" onclick="toggleImg(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg> 查看图片</span><div class="img-fold"><img src="${newestMsg.image_url}" alt="配图" onclick="showOverlay(this.src)"></div>`;
     if (newestMsg.audio_url) msgHtml += `<audio controls src="${newestMsg.audio_url}" preload="metadata">您的浏览器不支持语音播放</audio>`;
     // 爱心复制按钮
     const copyText = newestMsg.text || '';
@@ -594,10 +607,10 @@ function toggleImg(el) {
   const foldDiv = el.nextElementSibling;
   if (foldDiv.classList.contains('show')) {
     foldDiv.classList.remove('show');
-    el.textContent = '📷 查看图片';
+    el.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg> 查看图片';
   } else {
     foldDiv.classList.add('show');
-    el.textContent = '📷 收起图片';
+    el.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg> 收起图片';
   }
 }
 
@@ -935,7 +948,7 @@ async function doRefresh() {
   if (!currentUser) return;
   const refreshBtn = document.getElementById('refresh-btn');
   refreshBtn.disabled = true;
-  refreshBtn.textContent = '⏳';
+  refreshBtn.innerHTML = ICO.refresh;
   try {
     const messages = await fetchMessages();
     hasNewMessages = false;  // 手动刷新恢复颜色
@@ -947,12 +960,16 @@ async function doRefresh() {
     console.error('刷新失败:', err);
   } finally {
     refreshBtn.disabled = false;
-    refreshBtn.textContent = '🔄';
+    refreshBtn.innerHTML = ICO.refresh;
   }
 }
 
 // ===== 初始化 =====
 document.addEventListener('DOMContentLoaded', async () => {
+  // 注入SVG图标
+  const icoMap = {'ico-img': ICO.img, 'ico-mic': ICO.mic, 'ico-refresh': ICO.refresh, 'ico-del': ICO.del};
+  Object.entries(icoMap).forEach(([id, svg]) => { const el = document.getElementById(id); if (el) el.innerHTML = svg; });
+
   // 隐藏加载层
   const overlay = document.getElementById('loading-overlay');
 
@@ -988,14 +1005,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   const savedTheme = localStorage.getItem('paynews-theme');
   if (savedTheme === 'light') {
     document.documentElement.classList.add('light');
-    document.getElementById('theme-toggle').textContent = '☀️';
+    document.getElementById('theme-toggle').innerHTML = ICO.sun;
   }
   document.getElementById('theme-toggle').addEventListener('click', () => {
     const html = document.documentElement;
     const btn = document.getElementById('theme-toggle');
     html.classList.toggle('light');
     const isLight = html.classList.contains('light');
-    btn.textContent = isLight ? '☀️' : '🌙';
+    btn.innerHTML = isLight ? ICO.sun : ICO.moon;
     localStorage.setItem('paynews-theme', isLight ? 'light' : 'dark');
   });
 
@@ -1086,7 +1103,7 @@ function gkRenderNews(messages) {
       summaryContent += `<span style="color:var(--text-dim);font-size:13px;"> ${escapeHtml(olderMsg.text)}</span>`;
     }
     if (summaryContent) msgHtml += `<p>${summaryContent}</p>`;
-    if (newestMsg.image_url) msgHtml += `<span class="img-toggle" onclick="toggleImg(this)">📷 查看图片</span><div class="img-fold"><img src="${newestMsg.image_url}" alt="配图" onclick="showOverlay(this.src)"></div>`;
+    if (newestMsg.image_url) msgHtml += `<span class="img-toggle" onclick="toggleImg(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg> 查看图片</span><div class="img-fold"><img src="${newestMsg.image_url}" alt="配图" onclick="showOverlay(this.src)"></div>`;
     if (newestMsg.audio_url) msgHtml += `<audio controls src="${newestMsg.audio_url}" preload="metadata">您的浏览器不支持语音播放</audio>`;
     const copyText = newestMsg.text || '';
     msgHtml += `<span class="copy-heart" onclick="copyComment(this, '${escapeHtml(copyText).replace(/'/g, "\\'")}')" title="复制评论">♡</span>`;
