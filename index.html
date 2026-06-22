@@ -946,6 +946,12 @@ function doLogout() {
   pendingImageFile = null;
   pendingVoiceBlob = null;
   if (mediaRecorder && mediaRecorder.state === 'recording') stopRecording();
+  // 退出时清理对讲机和Presence频道，避免残留在线状态
+  if (walkieChannel) { try { supabaseClient.removeChannel(walkieChannel); } catch(e) {} walkieChannel = null; }
+  if (presenceChannel) { try { supabaseClient.removeChannel(presenceChannel); } catch(e) {} presenceChannel = null; }
+  walkieSubscribed = false;
+  onlineSubscribers = {};
+  if (currentWalkieAudio) { currentWalkieAudio.pause(); currentWalkieAudio = null; }
   document.getElementById('member-page').classList.remove('active');
   document.getElementById('public-page').classList.add('active');
   document.getElementById('login-account').value = '';
@@ -1056,6 +1062,8 @@ let walkieSubscribed = false;  // 是否订阅（开关状态）
 let pttRecorder = null;
 let pttChunks = [];
 let pttActive = false;
+let currentWalkieAudio = null;  // 追踪当前播放的对讲机音频，避免叠加
+let pttTimer = null;  // PTT录音最长时长计时器
 
 function initWalkieTalkie() {
   if (!supabaseClient || !currentUser) return;
@@ -1109,7 +1117,8 @@ function toggleWalkieSub() {
   } else {
     toggle.classList.remove('on');
     icon.innerHTML = ICO.speakerOff;
-    // 关闭时隐藏广播条
+    // 关闭时隐藏广播条，停掉正在播放的音频
+    if (currentWalkieAudio) { currentWalkieAudio.pause(); currentWalkieAudio = null; }
     document.getElementById('walkie-broadcast-bar').classList.remove('show');
     setGuestIdBroadcasting(false);
   }
@@ -1142,17 +1151,21 @@ function updateAllCopyIcons() {
 async function playWalkieVoice(payload) {
   const bar = document.getElementById('walkie-broadcast-bar');
   try {
+    // 先停掉上一条对讲机音频，避免叠加
+    if (currentWalkieAudio) { currentWalkieAudio.pause(); currentWalkieAudio = null; }
     bar.classList.add('show');
     setGuestIdBroadcasting(true);
     // data URL不支持带codecs的MIME，只取分号前的主类型
     const rawMime = payload.mime || 'audio/mp4';
     const mime = rawMime.split(';')[0];
     const audio = new Audio(`data:${mime};base64,${payload.audio}`);
+    currentWalkieAudio = audio;
     audio.volume = 0.9;
-    audio.onended = () => { bar.classList.remove('show'); setGuestIdBroadcasting(false); };
-    audio.onerror = () => { bar.classList.remove('show'); setGuestIdBroadcasting(false); console.error('对讲机播放失败'); };
+    audio.onended = () => { currentWalkieAudio = null; bar.classList.remove('show'); setGuestIdBroadcasting(false); };
+    audio.onerror = () => { currentWalkieAudio = null; bar.classList.remove('show'); setGuestIdBroadcasting(false); console.error('对讲机播放失败'); };
     await audio.play();
   } catch (e) {
+    currentWalkieAudio = null;
     console.error('对讲机播放异常:', e);
     bar.classList.remove('show');
     setGuestIdBroadcasting(false);
@@ -1179,6 +1192,7 @@ function startPTT(e) {
     pttRecorder = new MediaRecorder(stream, { mimeType: selectedMime });
     pttRecorder.ondataavailable = (ev) => { if (ev.data.size > 0) pttChunks.push(ev.data); };
     pttRecorder.onstop = () => {
+      if (pttTimer) { clearTimeout(pttTimer); pttTimer = null; }
       stream.getTracks().forEach(t => t.stop());
       const blob = new Blob(pttChunks, { type: selectedMime });
       // 转base64并发送
@@ -1198,6 +1212,8 @@ function startPTT(e) {
       pttActive = false;
     };
     pttRecorder.start();
+    // 最长录音30秒自动停止，避免base64过大导致广播失败
+    pttTimer = setTimeout(() => { if (pttRecorder && pttRecorder.state === 'recording') pttRecorder.stop(); }, 30000);
   }).catch(err => {
     console.error('麦克风获取失败:', err);
     btn.classList.remove('ptt-active');
@@ -1207,6 +1223,7 @@ function startPTT(e) {
 
 function stopPTT(e) {
   e.preventDefault();
+  if (pttTimer) { clearTimeout(pttTimer); pttTimer = null; }
   if (pttRecorder && pttRecorder.state === 'recording') {
     pttRecorder.stop();
   }
