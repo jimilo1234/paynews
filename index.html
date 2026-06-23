@@ -152,10 +152,10 @@ html.light .walkie-sub-toggle.on .toggle-knob { background: var(--accent-light);
 .tab-btn:hover { color: var(--text); }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
-.tab-panel iframe { width: 100%; height: 70vh; border: none; border-radius: 8px; background: var(--bg-dark); }
-.iframe-wrapper { position: relative; }
+.tab-panel iframe { width: 100%; border: none; border-radius: 8px; background: var(--bg-dark); }
+.iframe-wrapper { position: relative; width: 100%; height: 100%; }
 .iframe-toolbar { display: flex; gap: 8px; margin-bottom: 8px; justify-content: flex-end; }
-.iframe-wrapper iframe { width: 100%; height: 75vh; border: none; border-radius: 8px; background: var(--bg-dark); }
+.iframe-wrapper iframe { width: 100%; border: none; border-radius: 8px; background: var(--bg-dark); }
 /* AI助手 Chat SDK */
 #coze-chat-container { border-radius: 12px; overflow: hidden; background: var(--bg-card); }
 
@@ -453,7 +453,7 @@ html.light .guest-id.broadcasting { color: #222; }
       <!-- AI助手 tab：iframe嵌入 -->
       <div class="tab-panel" id="tab-movie">
         <div class="iframe-wrapper">
-          <iframe id="ai-assistant-iframe" src="https://bailiangroup.aiforce.cloud/app/app_4kebg037d5txp" style="width:100%;height:75vh;border:none;border-radius:8px;background:var(--bg-dark);"></iframe>
+          <iframe id="ai-assistant-iframe" src="https://bailiangroup.aiforce.cloud/app/app_4kebg037d5txp" style="width:100%;border:none;border-radius:8px;background:var(--bg-dark);"></iframe>
         </div>
       </div>
       <div class="tab-panel" id="tab-video">
@@ -1400,11 +1400,32 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if (targetId === 'tab-movie' && (!currentUser || currentUser.username !== '0110')) {
       return;
     }
-    // AI助手tab：无需额外初始化（iframe自动加载）
-    if (targetId !== 'tab-movie') {
-      // 切走时无需处理
+    // AI助手tab：动态调整iframe高度撑满屏幕
+    if (isAITab) {
+      resizeAIIFrame();
     }
   });
+});
+
+// AI助手iframe自适应高度
+function resizeAIIFrame() {
+  const iframe = document.getElementById('ai-assistant-iframe');
+  if (!iframe) return;
+  // 获取tab-bar的位置作为起点，视口底部作为终点
+  const tabBar = document.querySelector('.tab-bar');
+  if (!tabBar) return;
+  const tabBarRect = tabBar.getBoundingClientRect();
+  // iframe高度 = 视口高度 - tab栏底部位置 - 底部留白
+  const bottomPadding = 16;
+  const availableHeight = window.innerHeight - tabBarRect.bottom - bottomPadding;
+  iframe.style.height = Math.max(400, availableHeight) + 'px';
+}
+// 窗口resize时同步调整
+window.addEventListener('resize', function() {
+  const aiPanel = document.getElementById('tab-movie');
+  if (aiPanel && aiPanel.classList.contains('active')) {
+    resizeAIIFrame();
+  }
 });
 
 // ===== 五子棋 =====
