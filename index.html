@@ -1391,6 +1391,9 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     // 切换面板
     this.closest('.page-inner').querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.getElementById(targetId).classList.add('active');
+    // AI助手tab隐藏评论输入区，其他tab显示
+    const inputArea = document.querySelector('.message-input-area');
+    if (inputArea) inputArea.style.display = (targetId === 'tab-movie') ? 'none' : '';
     // AI助手tab：仅0110可用
     if (targetId === 'tab-movie' && (!currentUser || currentUser.username !== '0110')) {
       return;
