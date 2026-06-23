@@ -425,12 +425,10 @@ html.light .guest-id.broadcasting { color: #222; }
 
   <!-- 广播订阅中 -->
   <div class="walkie-broadcast-bar" id="walkie-broadcast-bar">
-    <span id="walkie-status" style="font-size:11px;opacity:0.7;margin-right:6px;"></span>
     <div class="pulse-dot"></div>
     <span>广播订阅中...</span>
   </div>
 
-  <div id="wt-debug-btn" onclick="document.getElementById('wt-debug').style.display='block'" style="position:fixed;bottom:10px;right:10px;background:rgba(108,92,231,0.6);color:#fff;width:32px;height:32px;border-radius:50%;display:none;align-items:center;justify-content:center;cursor:pointer;z-index:9998;font-size:14px;">🔍</div>
   <div class="newspaper-header">
         <div style="position:absolute;left:12px;top:14px;">
           <span class="walkie-sub-toggle" id="walkie-sub-toggle" onclick="toggleWalkieSub()">
@@ -929,7 +927,6 @@ async function doLogin() {
     const messages = await fetchMessages();
     document.getElementById('public-page').classList.remove('active');
     document.getElementById('member-page').classList.add('active');
-    document.getElementById('wt-debug-btn').style.display = 'flex';
     renderNews('member-news-grid', 'member-news-date', messages);
     // 登录后重新初始化对讲机（用正确的用户名作为Presence key）
     initWalkieTalkie();
@@ -958,8 +955,6 @@ function doLogout() {
   stopWalkieAudio();
   document.getElementById('member-page').classList.remove('active');
   document.getElementById('public-page').classList.add('active');
-  document.getElementById('wt-debug-btn').style.display = 'none';
-  document.getElementById('wt-debug').style.display = 'none';
   document.getElementById('login-account').value = '';
   document.getElementById('login-password').value = '';
   document.getElementById('login-error').textContent = '';
@@ -1074,99 +1069,27 @@ let walkieChannelReady = false;  // 对讲机频道是否已订阅就绪
 let walkieAudioCtx = null;  // AudioContext，在用户手势时解锁以绕过autoplay限制
 
 
-// ===== 对讲机诊断工具 =====
-function wtLog(msg, type) {
-  const ts = new Date().toLocaleTimeString();
-  const color = type === 'err' ? '#f66' : type === 'ok' ? '#0f0' : type === 'warn' ? '#ff0' : '#0ff';
-  const line = '<div style="color:' + color + ';">[' + ts + '] ' + msg + '</div>';
-  const logEl = document.getElementById('wt-log');
-  if (logEl) { logEl.innerHTML += line; logEl.scrollTop = logEl.scrollHeight; }
-  console.log('[对讲机诊断] ' + msg);
-}
-
-function wtTestSend() {
-  wtLog('--- 测试发送开始 ---', 'warn');
-  wtLog('supabaseClient: ' + !!supabaseClient, supabaseClient ? 'ok' : 'err');
-  wtLog('walkieChannel: ' + !!walkieChannel, walkieChannel ? 'ok' : 'err');
-  wtLog('walkieChannelReady: ' + walkieChannelReady, walkieChannelReady ? 'ok' : 'err');
-  wtLog('walkieSubscribed: ' + walkieSubscribed, walkieSubscribed ? 'ok' : 'warn');
-  wtLog('currentUser: ' + (currentUser?.username || 'null'), currentUser ? 'ok' : 'err');
-  wtLog('AudioContext: ' + (walkieAudioCtx ? walkieAudioCtx.state : 'null'), walkieAudioCtx?.state === 'running' ? 'ok' : 'warn');
-
-  if (!walkieChannel || !walkieChannelReady) {
-    wtLog('❌ 频道未就绪，无法发送！', 'err');
-    return;
-  }
-
-  // 生成一段短正弦波作为测试音频 (0.5秒, 440Hz)
-  try {
-    const sampleRate = 8000;
-    const duration = 0.5;
-    const numSamples = Math.floor(sampleRate * duration);
-    // 生成WAV文件
-    const wavBuffer = new ArrayBuffer(44 + numSamples * 2);
-    const view = new DataView(wavBuffer);
-    // WAV header
-    const writeStr = (off, s) => { for(let i=0;i<s.length;i++) view.setUint8(off+i, s.charCodeAt(i)); };
-    writeStr(0, 'RIFF');
-    view.setUint32(4, 36 + numSamples * 2, true);
-    writeStr(8, 'WAVE');
-    writeStr(12, 'fmt ');
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true); // PCM
-    view.setUint16(22, 1, true); // mono
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate * 2, true);
-    view.setUint16(32, 2, true);
-    view.setUint16(34, 16, true);
-    writeStr(36, 'data');
-    view.setUint32(40, numSamples * 2, true);
-    for (let i = 0; i < numSamples; i++) {
-      const val = Math.sin(2 * Math.PI * 440 * i / sampleRate) * 0.5;
-      view.setInt16(44 + i * 2, val * 32767, true);
-    }
-    // WAV → base64
-    const bytes = new Uint8Array(wavBuffer);
-    let binary = '';
-    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-    const base64 = btoa(binary);
-    wtLog('测试音频base64长度: ' + base64.length, 'ok');
-
-    const sendResult = walkieChannel.send({
-      type: 'broadcast',
-      event: 'voice',
-      payload: { audio: base64, mime: 'audio/wav', from: (currentUser?.display_name || '测试') + '[测试嘟声]' }
-    });
-    wtLog('send返回: ' + JSON.stringify(sendResult), sendResult === 'ok' ? 'ok' : 'warn');
-    wtLog('✅ 测试嘟声已发送，看对方浏览器是否播放', 'ok');
-  } catch(e) {
-    wtLog('❌ 测试发送失败: ' + e.message, 'err');
-  }
-}
-
 function initWalkieTalkie() {
-  if (!supabaseClient || !currentUser) { wtLog('initWalkieTalkie跳过: supabase=' + !!supabaseClient + ' user=' + !!currentUser, 'warn'); return; }
+  if (!supabaseClient || !currentUser) { console.warn('[对讲机]', 'initWalkieTalkie跳过: supabase=' + !!supabaseClient + ' user=' + !!currentUser); return; }
   walkieChannelReady = false;
-  wtLog('initWalkieTalkie开始, user=' + currentUser.username, 'ok');
+  console.log('[对讲机] initWalkieTalkie开始, user=' + currentUser.username);
   // 对讲机频道：只负责语音广播
   if (walkieChannel) { try { supabaseClient.removeChannel(walkieChannel); } catch(e) {} }
   walkieChannel = supabaseClient.channel('walkie-talkie', {
     config: { broadcast: { self: false } }
   });
-  wtLog('walkieChannel已创建', 'ok');
+  console.log('[对讲机] walkieChannel已创建');
   walkieChannel.on('broadcast', { event: 'voice' }, (msg) => {
-    wtLog('收到广播! walkieSubscribed=' + walkieSubscribed + ' msgKeys=' + Object.keys(msg).join(','), 'ok');
-    if (!walkieSubscribed) { wtLog('⚠️ 订阅未开启，忽略', 'warn'); return; }
+    console.log('[对讲机] 收到广播! walkieSubscribed=' + walkieSubscribed + ' msgKeys=' + Object.keys(msg).join(','));
+    if (!walkieSubscribed) { console.warn('[对讲机] ⚠️ 订阅未开启，忽略'); return; }
     const data = msg.payload && msg.payload.audio ? msg.payload : (msg.audio ? msg : null);
-    if (!data) { wtLog('❌ payload结构异常: ' + JSON.stringify(msg).substring(0,300), 'err'); return; }
-    wtLog('payload OK, mime=' + data.mime + ' audioLen=' + (data.audio?.length), 'ok');
+    if (!data) { console.error('[对讲机] payload结构异常:', JSON.stringify(msg).substring(0,300)); return; }
+    console.log('[对讲机] payload OK, mime=' + data.mime + ' audioLen=' + (data.audio?.length));
     playWalkieVoice(data);
   });
   walkieChannel.subscribe((status, err) => {
-    wtLog('频道状态: ' + status + (err ? ' err:' + err : ''), status === 'SUBSCRIBED' ? 'ok' : 'warn');
+    console.log('[对讲机] 频道状态:', status, err || '');
     walkieChannelReady = (status === 'SUBSCRIBED');
-    const stEl = document.getElementById('walkie-status');
-    if (stEl) stEl.textContent = status === 'SUBSCRIBED' ? '' : '[' + status + ']';
   });
   // 在线状态频道：独立Presence追踪
   if (presenceChannel) { try { supabaseClient.removeChannel(presenceChannel); } catch(e) {} }
@@ -1198,13 +1121,13 @@ function initWalkieTalkie() {
 
 function toggleWalkieSub() {
   walkieSubscribed = !walkieSubscribed;
-  wtLog('订阅开关: ' + walkieSubscribed, walkieSubscribed ? 'ok' : 'warn');
+  console.log('[对讲机] 订阅开关:', walkieSubscribed);
   // 在用户手势中解锁AudioContext，绕过浏览器autoplay限制
   if (walkieSubscribed) {
     try {
       if (!walkieAudioCtx) walkieAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
       if (walkieAudioCtx.state === 'suspended') walkieAudioCtx.resume();
-      wtLog('AudioContext已解锁: ' + walkieAudioCtx.state, walkieAudioCtx.state === 'running' ? 'ok' : 'warn');
+      console.log('[对讲机] AudioContext已解锁, state:', walkieAudioCtx.state);
     } catch(e) { console.warn('[对讲机] AudioContext初始化失败:', e); }
   }
   const toggle = document.getElementById('walkie-sub-toggle');
@@ -1256,7 +1179,7 @@ async function playWalkieVoice(payload) {
 
     const rawMime = payload.mime || 'audio/mp4';
     const mime = rawMime.split(';')[0];
-    wtLog('播放: mime=' + rawMime + '→' + mime + ' b64Len=' + (payload.audio?.length), 'ok');
+    console.log('[对讲机]', '播放: mime=' + rawMime + '→' + mime + ' b64Len=' + (payload.audio?.length));
 
     // base64 → 二进制
     const binStr = atob(payload.audio);
@@ -1273,10 +1196,10 @@ async function playWalkieVoice(payload) {
         source.onended = () => { currentWalkieAudio = null; bar.classList.remove('show'); setGuestIdBroadcasting(false); console.log('[对讲机] AC播放结束'); };
         currentWalkieAudio = source;
         source.start(0);
-        wtLog('✅ AudioContext播放成功！', 'ok');
+        console.log('[对讲机] ✅ AudioContext播放成功！');
         return;
       } catch(acErr) {
-        wtLog('⚠️ AC解码失败，fallback: ' + acErr.message, 'warn');
+        console.warn('[对讲机]', '⚠️ AC解码失败，fallback: ' + acErr.message);
       }
     }
 
@@ -1288,13 +1211,13 @@ async function playWalkieVoice(payload) {
     currentWalkieAudio = audio;
     audio.volume = 0.9;
     audio.onended = () => { URL.revokeObjectURL(blobUrl); currentWalkieAudio = null; bar.classList.remove('show'); setGuestIdBroadcasting(false); console.log('[对讲机] Audio播放结束'); };
-    audio.onerror = (e) => { URL.revokeObjectURL(blobUrl); currentWalkieAudio = null; bar.classList.remove('show'); setGuestIdBroadcasting(false); wtLog('❌ Audio播放失败: ' + audio.error, 'err'); };
-    wtLog('Audio元素fallback播放...', 'ok');
+    audio.onerror = (e) => { URL.revokeObjectURL(blobUrl); currentWalkieAudio = null; bar.classList.remove('show'); setGuestIdBroadcasting(false); console.error('[对讲机]', '❌ Audio播放失败: ' + audio.error); };
+    console.log('[对讲机] Audio元素fallback播放...');
     await audio.play();
-    wtLog('✅ Audio play()成功！', 'ok');
+    console.log('[对讲机] ✅ Audio play()成功！');
   } catch (e) {
     currentWalkieAudio = null;
-    wtLog('❌ 播放异常: ' + e.message, 'err');
+    console.error('[对讲机]', '❌ 播放异常: ' + e.message);
     bar.classList.remove('show');
     setGuestIdBroadcasting(false);
   }
@@ -1315,7 +1238,7 @@ function stopWalkieAudio() {
 function startPTT(e) {
   e.preventDefault();
   if (pttActive || !supabaseClient || !walkieChannel) return;
-  if (!walkieChannelReady) { wtLog('❌ 频道未就绪，无法录音！', 'err'); return; }
+  if (!walkieChannelReady) { console.error('[对讲机] ❌ 频道未就绪，无法录音！'); return; }
   pttActive = true;
   pttChunks = [];
   const btn = document.getElementById('walkie-btn');
@@ -1342,13 +1265,13 @@ function startPTT(e) {
         const base64 = reader.result.split(',')[1];
         if (base64 && walkieChannel) {
           try {
-            wtLog('发送语音 mime=' + selectedMime + ' b64Len=' + base64.length, 'ok');
+            console.log('[对讲机]', '发送语音 mime=' + selectedMime + ' b64Len=' + base64.length);
             const sendResult = walkieChannel.send({
               type: 'broadcast',
               event: 'voice',
               payload: { audio: base64, mime: selectedMime, from: currentUser?.display_name || '匿名' }
             });
-            wtLog('send返回: ' + JSON.stringify(sendResult), 'ok');
+            console.log('[对讲机]', 'send返回: ' + JSON.stringify(sendResult));
           } catch (sendErr) {
             console.error('[对讲机] 发送失败:', sendErr);
           }
@@ -1359,7 +1282,7 @@ function startPTT(e) {
       pttActive = false;
     };
     pttRecorder.start();
-      wtLog('录音开始, mime=' + selectedMime, 'ok');
+      console.log('[对讲机] 录音开始, mime=' + selectedMime);
     // 最长录音30秒自动停止，避免base64过大导致广播失败
     pttTimer = setTimeout(() => { if (pttRecorder && pttRecorder.state === 'recording') pttRecorder.stop(); }, 30000);
   }).catch(err => {
@@ -1888,17 +1811,5 @@ function gomokuBackLobby() {
 }
 
   </script>
-
-<!-- 对讲机诊断面板 -->
-<div id="wt-debug" style="position:fixed;bottom:0;left:0;right:0;max-height:40vh;background:rgba(0,0,0,0.95);color:#0f0;font-size:11px;font-family:monospace;z-index:9999;overflow-y:auto;display:none;padding:8px;box-sizing:border-box;">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-    <b style="color:#ff0;">🔍 对讲机诊断</b>
-    <span>
-      <button onclick="wtTestSend()" style="background:#333;color:#0f0;border:1px solid #0f0;padding:2px 8px;cursor:pointer;margin-right:4px;">📡测试发送</button>
-      <button onclick="document.getElementById('wt-debug').style.display='none'" style="background:#333;color:#f66;border:1px solid #f66;padding:2px 8px;cursor:pointer;">✕关闭</button>
-    </span>
-  </div>
-  <div id="wt-log"></div>
-</div>
 </body>
 </html>
