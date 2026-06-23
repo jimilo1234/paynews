@@ -88,6 +88,7 @@ html.light .theme-toggle { background: rgba(108,92,231,0.15); border-color: rgba
 .walkie-sub-toggle {
   display: inline-flex; align-items: center; gap: 4px;
   background: none; color: var(--text-dim);
+  font-size: 13px; cursor: pointer; user-select: none;
   border: none; padding: 2px 0; font-size: 11px;
   cursor: pointer; transition: color 0.3s; user-select: none;
   white-space: nowrap; opacity: 0.6;
@@ -419,6 +420,11 @@ html.light .guest-id.broadcasting { color: #222; }
 
   <!-- 页面2：登录后 -->
   <div id="member-page" class="page">
+    <span class="walkie-sub-toggle" id="walkie-sub-toggle" onclick="toggleWalkieSub()" style="position:fixed;top:18px;left:12px;z-index:200;">
+      <span id="walkie-sub-icon"></span>
+      <span>订阅广播</span>
+      <span class="toggle-track"><span class="toggle-knob"></span></span>
+    </span>
     <button class="logout-btn" id="logout-btn">刷新新闻</button>
     <button class="theme-toggle" id="theme-toggle" title="切换日/夜模式"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg></button>
     <div class="page-inner" style="padding-bottom:280px;">
@@ -429,14 +435,7 @@ html.light .guest-id.broadcasting { color: #222; }
     <span>广播订阅中...</span>
   </div>
 
-  <div class="newspaper-header">
-        <div style="position:absolute;left:12px;top:14px;">
-          <span class="walkie-sub-toggle" id="walkie-sub-toggle" onclick="toggleWalkieSub()">
-            <span id="walkie-sub-icon"></span>
-            <span>订阅广播</span>
-            <span class="toggle-track"><span class="toggle-knob"></span></span>
-          </span>
-        </div>
+  <div class="newspaper-header" id="member-newspaper-header">
         <h1>支付行业新闻</h1>
         <p class="date" id="member-news-date"></p>
         <div class="header-line"></div>
@@ -1391,9 +1390,12 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     // 切换面板
     this.closest('.page-inner').querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.getElementById(targetId).classList.add('active');
-    // AI助手tab隐藏评论输入区，其他tab显示
+    // AI助手tab：隐藏header和评论输入区
+    const memberHeader = document.getElementById('member-newspaper-header');
     const inputArea = document.querySelector('.message-input-area');
-    if (inputArea) inputArea.style.display = (targetId === 'tab-movie') ? 'none' : '';
+    const isAITab = (targetId === 'tab-movie');
+    if (memberHeader) memberHeader.style.display = isAITab ? 'none' : '';
+    if (inputArea) inputArea.style.display = isAITab ? 'none' : '';
     // AI助手tab：仅0110可用
     if (targetId === 'tab-movie' && (!currentUser || currentUser.username !== '0110')) {
       return;
