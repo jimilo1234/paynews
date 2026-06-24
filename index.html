@@ -929,6 +929,8 @@ async function doLogin() {
     renderNews('member-news-grid', 'member-news-date', messages);
     // 登录后重新初始化对讲机（用正确的用户名作为Presence key）
     initWalkieTalkie();
+    // 订阅messages表实时变更，新消息立即刷新评论
+    subscribeMessageChanges();
 
   } catch (err) {
     console.error('登录失败:', err);
@@ -948,6 +950,7 @@ function doLogout() {
   // 退出时清理对讲机和Presence频道，避免残留在线状态
   if (walkieChannel) { try { supabaseClient.removeChannel(walkieChannel); } catch(e) {} walkieChannel = null; }
   if (presenceChannel) { try { supabaseClient.removeChannel(presenceChannel); } catch(e) {} presenceChannel = null; }
+  if (messagesChannel) { try { supabaseClient.removeChannel(messagesChannel); } catch(e) {} messagesChannel = null; }
   walkieSubscribed = false;
   walkieChannelReady = false;
   onlineSubscribers = {};
@@ -1068,6 +1071,32 @@ let pttTimer = null;  // PTT录音最长时长计时器
 let walkieChannelReady = false;  // 对讲机频道是否已订阅就绪
 let walkieAudioCtx = null;  // AudioContext，在用户手势时解锁以绕过autoplay限制
 
+
+// 订阅messages表实时变更，新消息立即刷新行业评论
+let messagesChannel = null;
+function subscribeMessageChanges() {
+  if (!supabaseClient || messagesChannel) return;  // 避免重复订阅
+  messagesChannel = supabaseClient
+    .channel('messages-realtime')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
+      console.log('[实时消息] 新评论:', payload.new);
+      // 立即拉取最新消息并刷新行业简报评论
+      try {
+        const messages = await fetchMessages();
+        renderNews('member-news-grid', 'member-news-date', messages, true);
+        // 如果行业政策tab也可见，同步刷新
+        const gkGrid = document.getElementById('gk-news-grid');
+        if (gkGrid && gkGrid.style.display !== 'none') {
+          gkRenderNews(messages);
+        }
+      } catch (err) {
+        console.error('[实时消息] 刷新失败:', err);
+      }
+    })
+    .subscribe((status) => {
+      console.log('[实时消息] 频道状态:', status);
+    });
+}
 
 function initWalkieTalkie() {
   if (!supabaseClient || !currentUser) { console.warn('[对讲机]', 'initWalkieTalkie跳过: supabase=' + !!supabaseClient + ' user=' + !!currentUser); return; }
