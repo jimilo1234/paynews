@@ -950,7 +950,7 @@ function doLogout() {
   // 退出时清理对讲机和Presence频道，避免残留在线状态
   if (walkieChannel) { try { supabaseClient.removeChannel(walkieChannel); } catch(e) {} walkieChannel = null; }
   if (presenceChannel) { try { supabaseClient.removeChannel(presenceChannel); } catch(e) {} presenceChannel = null; }
-  if (messagesChannel) { try { supabaseClient.removeChannel(messagesChannel); } catch(e) {} messagesChannel = null; }
+  if (messagesNotifyChannel) { try { supabaseClient.removeChannel(messagesNotifyChannel); } catch(e) {} messagesNotifyChannel = null; }
   walkieSubscribed = false;
   walkieChannelReady = false;
   onlineSubscribers = {};
@@ -995,6 +995,9 @@ async function doSendMessage() {
 
     // 发送留言
     await sendMessage(currentUser.username, currentUser.displayName, text, imageUrl, audioUrl);
+
+    // 通知其他客户端有新消息
+    notifyNewMessage();
 
     // 清空输入
     document.getElementById('msg-text').value = '';
@@ -1072,30 +1075,35 @@ let walkieChannelReady = false;  // 对讲机频道是否已订阅就绪
 let walkieAudioCtx = null;  // AudioContext，在用户手势时解锁以绕过autoplay限制
 
 
-// 订阅messages表实时变更，新消息立即刷新行业评论
-let messagesChannel = null;
+// 新消息实时通知：用Broadcast频道通知其他客户端刷新
+let messagesNotifyChannel = null;
 function subscribeMessageChanges() {
-  if (!supabaseClient || messagesChannel) return;  // 避免重复订阅
-  messagesChannel = supabaseClient
-    .channel('messages-realtime')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
-      console.log('[实时消息] 新评论:', payload.new);
-      // 立即拉取最新消息并刷新行业简报评论
-      try {
-        const messages = await fetchMessages();
-        renderNews('member-news-grid', 'member-news-date', messages, true);
-        // 如果行业政策tab也可见，同步刷新
-        const gkGrid = document.getElementById('gk-news-grid');
-        if (gkGrid && gkGrid.style.display !== 'none') {
-          gkRenderNews(messages);
-        }
-      } catch (err) {
-        console.error('[实时消息] 刷新失败:', err);
+  if (!supabaseClient || messagesNotifyChannel) return;
+  messagesNotifyChannel = supabaseClient.channel('messages-notify', {
+    config: { broadcast: { self: false } }
+  });
+  messagesNotifyChannel.on('broadcast', { event: 'new-message' }, async () => {
+    console.log('[实时消息] 收到新评论通知，立即刷新');
+    try {
+      const messages = await fetchMessages();
+      renderNews('member-news-grid', 'member-news-date', messages, true);
+      const gkGrid = document.getElementById('gk-news-grid');
+      if (gkGrid && gkGrid.style.display !== 'none') {
+        gkRenderNews(messages);
       }
-    })
-    .subscribe((status) => {
-      console.log('[实时消息] 频道状态:', status);
-    });
+    } catch (err) {
+      console.error('[实时消息] 刷新失败:', err);
+    }
+  });
+  messagesNotifyChannel.subscribe((status) => {
+    console.log('[消息通知频道] 状态:', status);
+  });
+}
+// 发送新消息后广播通知其他客户端
+function notifyNewMessage() {
+  if (messagesNotifyChannel) {
+    messagesNotifyChannel.send({ type: 'broadcast', event: 'new-message', payload: { ts: Date.now() } });
+  }
 }
 
 function initWalkieTalkie() {
