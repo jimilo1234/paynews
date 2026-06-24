@@ -652,7 +652,7 @@ function renderNews(containerId, dateId, userMessages, isAutoRefresh) {
     const hh = String(ts.getHours()).padStart(2,'0');
     const mm = String(ts.getMinutes()).padStart(2,'0');
     const ss = String(ts.getSeconds()).padStart(2,'0');
-    msgHtml += `<div class="news-category-line"><div class="news-category">行业评论</div><div class="guest-id"><span class="online-count"></span>线上网友${hh}${mm}${ss}</div></div>`;
+    msgHtml += `<div class="news-category-line"><div class="news-category">行业评论</div><div class="guest-id"><span class="online-count">${onlineCount > 0 ? onlineCount : ""}</span>线上网友${hh}${mm}${ss}</div></div>`;
     if (newestMsg.text) msgHtml += `<h3>${escapeHtml(newestMsg.text)}</h3>`;
     // 评论下方添加伪装描述（取第一条新闻摘要）
     let summaryContent = '';
@@ -1116,6 +1116,17 @@ function initWalkieTalkie() {
     console.log('Presence频道状态:', status);
     if (status === 'SUBSCRIBED') {
       await presenceChannel.track({ walkieSub: walkieSubscribed, online: true });
+      // track后立即重新计算在线人数（首次sync可能在track前触发导致漏计自己）
+      setTimeout(() => {
+        const state = presenceChannel.presenceState();
+        onlineCount = 0;
+        for (const key in state) {
+          const presences = state[key];
+          if (presences && presences.length > 0) onlineCount++;
+        }
+        console.log('track后重新计算在线人数:', onlineCount);
+        updateOnlineCountDisplay();
+      }, 1000);
     }
   });
   // 初始化开关图标
@@ -1467,7 +1478,7 @@ function gkRenderNews(messages) {
     const hh = String(ts.getHours()).padStart(2,'0');
     const mm = String(ts.getMinutes()).padStart(2,'0');
     const ss = String(ts.getSeconds()).padStart(2,'0');
-    msgHtml += `<div class="news-category-line"><div class="news-category">最新评论</div><div class="guest-id"><span class="online-count"></span>线上网友${hh}${mm}${ss}</div></div>`;
+    msgHtml += `<div class="news-category-line"><div class="news-category">最新评论</div><div class="guest-id"><span class="online-count">${onlineCount > 0 ? onlineCount : ""}</span>线上网友${hh}${mm}${ss}</div></div>`;
     if (newestMsg.text) msgHtml += `<h3>${escapeHtml(newestMsg.text)}</h3>`;
     // 评论下方：第一条新闻摘要 + 上一条评论（小字灰色），与行业简报逻辑一致
     let summaryContent = '';
