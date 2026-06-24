@@ -652,7 +652,7 @@ function renderNews(containerId, dateId, userMessages, isAutoRefresh) {
     const hh = String(ts.getHours()).padStart(2,'0');
     const mm = String(ts.getMinutes()).padStart(2,'0');
     const ss = String(ts.getSeconds()).padStart(2,'0');
-    msgHtml += `<div class="news-category-line"><div class="news-category">行业评论</div><div class="guest-id">线上网友${hh}${mm}${ss}</div></div>`;
+    msgHtml += `<div class="news-category-line"><div class="news-category">行业评论</div><div class="guest-id"><span class="online-count"></span>线上网友${hh}${mm}${ss}</div></div>`;
     if (newestMsg.text) msgHtml += `<h3>${escapeHtml(newestMsg.text)}</h3>`;
     // 评论下方添加伪装描述（取第一条新闻摘要）
     let summaryContent = '';
@@ -1058,6 +1058,7 @@ async function doRefresh() {
 // ===== 对讲机（Push-to-Talk via Supabase Broadcast） =====
 let walkieChannel = null;
 let presenceChannel = null;  // 独立的Presence频道追踪在线订阅状态
+let onlineCount = 0;  // 当前在线人数
 let walkieSubscribed = false;  // 是否订阅（开关状态）
 let pttRecorder = null;
 let pttChunks = [];
@@ -1098,15 +1099,18 @@ function initWalkieTalkie() {
   presenceChannel.on('presence', { event: 'sync' }, () => {
     const state = presenceChannel.presenceState();
     onlineSubscribers = {};
+    onlineCount = 0;
     for (const key in state) {
       const presences = state[key];
       if (presences && presences.length > 0) {
+        onlineCount++;
         const latest = presences[presences.length - 1];
         if (latest.walkieSub) onlineSubscribers[key] = true;
       }
     }
-    console.log('在线订阅者:', JSON.stringify(onlineSubscribers));
+    console.log('在线订阅者:', JSON.stringify(onlineSubscribers), '在线人数:', onlineCount);
     updateAllCopyIcons();
+    updateOnlineCountDisplay();
   });
   presenceChannel.subscribe(async (status) => {
     console.log('Presence频道状态:', status);
@@ -1428,6 +1432,13 @@ window.addEventListener('resize', function() {
   }
 });
 
+// 更新在线人数显示
+function updateOnlineCountDisplay() {
+  document.querySelectorAll('.online-count').forEach(el => {
+    el.textContent = onlineCount > 0 ? onlineCount : '';
+  });
+}
+
 // ===== 五子棋 =====
 const GK_SIZE = 15;
 let gkCurrentGame = null; // { id, player1, player2, board, current_turn, status, myRole }
@@ -1456,7 +1467,7 @@ function gkRenderNews(messages) {
     const hh = String(ts.getHours()).padStart(2,'0');
     const mm = String(ts.getMinutes()).padStart(2,'0');
     const ss = String(ts.getSeconds()).padStart(2,'0');
-    msgHtml += `<div class="news-category-line"><div class="news-category">最新评论</div><div class="guest-id">线上网友${hh}${mm}${ss}</div></div>`;
+    msgHtml += `<div class="news-category-line"><div class="news-category">最新评论</div><div class="guest-id"><span class="online-count"></span>线上网友${hh}${mm}${ss}</div></div>`;
     if (newestMsg.text) msgHtml += `<h3>${escapeHtml(newestMsg.text)}</h3>`;
     // 评论下方：第一条新闻摘要 + 上一条评论（小字灰色），与行业简报逻辑一致
     let summaryContent = '';
