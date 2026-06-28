@@ -155,6 +155,47 @@ html.light .walkie-sub-toggle.on .toggle-knob { background: var(--accent-light);
 .tab-panel iframe { width: 100%; border: none; border-radius: 8px; background: var(--bg-dark); }
 .iframe-wrapper { position: relative; width: 100%; height: 100%; }
 .iframe-toolbar { display: flex; gap: 8px; margin-bottom: 8px; justify-content: flex-end; }
+/* AI助手配置栏 */
+.ai-config-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  align-items: center;
+}
+.ai-config-bar input {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.2s;
+}
+.ai-config-bar input:focus {
+  border-color: var(--accent);
+}
+.ai-save-btn, .ai-refresh-btn {
+  padding: 8px 14px;
+  font-size: 13px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  white-space: nowrap;
+}
+.ai-refresh-btn {
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ai-save-btn:hover, .ai-refresh-btn:hover { opacity: 0.85; }
+.ai-save-btn:active, .ai-refresh-btn:active { transform: scale(0.97); }
+
 .iframe-wrapper iframe { width: 100%; border: none; border-radius: 8px; background: var(--bg-dark); }
 /* AI助手 Chat SDK */
 #coze-chat-container { border-radius: 12px; overflow: hidden; background: var(--bg-card); }
@@ -452,6 +493,13 @@ html.light .guest-id.broadcasting { color: #222; }
       </div>
       <!-- AI助手 tab：iframe嵌入 -->
       <div class="tab-panel" id="tab-movie">
+        <div class="ai-config-bar">
+          <input type="text" id="ai-url-input" placeholder="AI助手链接地址" autocomplete="off"/>
+          <button class="ai-save-btn" onclick="saveAIUrl()" title="保存配置并刷新">保存</button>
+          <button class="ai-refresh-btn" onclick="refreshAIFrame()" title="刷新当前页面">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+          </button>
+        </div>
         <div class="iframe-wrapper">
           <iframe id="ai-assistant-iframe" src="https://bailiangroup.aiforce.cloud/app/app_4kebg037d5txp" style="width:100%;border:none;border-radius:8px;background:var(--bg-dark);"></iframe>
         </div>
@@ -1452,24 +1500,73 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if (targetId === 'tab-movie' && (!currentUser || currentUser.username !== '0110')) {
       return;
     }
-    // AI助手tab：动态调整iframe高度撑满屏幕
+    // AI助手tab：动态调整iframe高度撑满屏幕 + 初始化配置
     if (isAITab) {
+      initAIConfig();
       resizeAIIFrame();
     }
   });
 });
 
+
+// AI助手链接配置（localStorage持久化）
+const AI_URL_KEY = 'paynews_ai_url';
+function initAIConfig() {
+  const savedUrl = localStorage.getItem(AI_URL_KEY);
+  const input = document.getElementById('ai-url-input');
+  const iframe = document.getElementById('ai-assistant-iframe');
+  if (savedUrl && input) {
+    input.value = savedUrl;
+    if (iframe && iframe.src !== savedUrl) {
+      iframe.src = savedUrl;
+    }
+  } else if (input && iframe) {
+    input.value = iframe.src;
+  }
+}
+function saveAIUrl() {
+  const input = document.getElementById('ai-url-input');
+  const iframe = document.getElementById('ai-assistant-iframe');
+  if (!input || !iframe) return;
+  let url = input.value.trim();
+  if (!url) { alert('请输入链接地址'); return; }
+  if (!/^https?:\/\//i.test(url)) {
+    if (confirm('链接不以http开头，是否自动补全https://？')) {
+      url = 'https://' + url;
+      input.value = url;
+    } else {
+      return;
+    }
+  }
+  localStorage.setItem(AI_URL_KEY, url);
+  // 自动刷新iframe
+  iframe.src = url;
+  console.log('[AI配置] 已保存并刷新:', url);
+}
+function refreshAIFrame() {
+  const iframe = document.getElementById('ai-assistant-iframe');
+  if (!iframe) return;
+  // 重新赋值src触发刷新
+  const currentSrc = iframe.src;
+  iframe.src = '';
+  setTimeout(() => { iframe.src = currentSrc; }, 50);
+}
 // AI助手iframe自适应高度
 function resizeAIIFrame() {
   const iframe = document.getElementById('ai-assistant-iframe');
   if (!iframe) return;
-  // 获取tab-bar的位置作为起点，视口底部作为终点
-  const tabBar = document.querySelector('.tab-bar');
-  if (!tabBar) return;
-  const tabBarRect = tabBar.getBoundingClientRect();
-  // iframe高度 = 视口高度 - tab栏底部位置 - 底部留白
+  // 从配置栏底部开始计算，视口底部作为终点
+  const configBar = document.querySelector('.ai-config-bar');
   const bottomPadding = 16;
-  const availableHeight = window.innerHeight - tabBarRect.bottom - bottomPadding;
+  let topOffset = 0;
+  if (configBar) {
+    topOffset = configBar.getBoundingClientRect().bottom + 10; // 10px间距
+  } else {
+    const tabBar = document.querySelector('.tab-bar');
+    if (!tabBar) return;
+    topOffset = tabBar.getBoundingClientRect().bottom;
+  }
+  const availableHeight = window.innerHeight - topOffset - bottomPadding;
   iframe.style.height = Math.max(400, availableHeight) + 'px';
 }
 // 窗口resize时同步调整
