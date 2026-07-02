@@ -1782,10 +1782,10 @@ async function cleanupStorage() {
         else console.log(`已清理 ${imagePaths.length} 个图片文件`);
       }
 
-      const twoHoursAgo = Date.now() - 2 * 3600000;
+      const thirtyMinAgo = Date.now() - 30 * 60 * 1000;
 
-      // 视频文件：只删除超过2小时的旧视频（给播放留足时间，同语音策略）
-      const oldVideoFiles = videoFiles.filter(f => new Date(f.created_at).getTime() < twoHoursAgo);
+      // 视频文件：只删除超过30分钟的旧视频
+      const oldVideoFiles = videoFiles.filter(f => new Date(f.created_at).getTime() < thirtyMinAgo);
       if (oldVideoFiles.length > 0) {
         const videoPaths = oldVideoFiles.map(f => f.name);
         await supabaseClient.storage.from('images').remove(videoPaths);
@@ -1797,8 +1797,8 @@ async function cleanupStorage() {
         if (msgErr) console.warn('清理视频链接失败:', msgErr);
       }
 
-      // 语音文件：只删除超过2小时的旧语音（给播放留足时间）
-      const oldVoiceFiles = voiceFiles.filter(f => new Date(f.created_at).getTime() < twoHoursAgo);
+      // 语音文件：只删除超过30分钟的旧语音
+      const oldVoiceFiles = voiceFiles.filter(f => new Date(f.created_at).getTime() < thirtyMinAgo);
       if (oldVoiceFiles.length > 0) {
         const voicePaths = oldVoiceFiles.map(f => f.name);
         await supabaseClient.storage.from('images').remove(voicePaths);
@@ -1810,7 +1810,7 @@ async function cleanupStorage() {
         if (msgErr) console.warn('清理语音链接失败:', msgErr);
       }
     }
-    // 只置空image_url（图片已删除），保留audio_url和video_url直到对应媒体过期
+    // 三类媒体均已统一30分钟清理策略，此处仅兜底置空image_url
     const { error: msgErr } = await supabaseClient
       .from('messages')
       .update({ image_url: null })
