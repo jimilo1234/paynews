@@ -408,6 +408,10 @@ html.light .guest-id.broadcasting { color: #222; }
 
 .preview-area { max-width: 600px; margin: 4px auto 0; }
 .preview-area img { max-height: 60px; border-radius: 6px; border: 1px solid var(--border-card); }
+.preview-area .video-preview-tag { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; background:var(--bg-card-hover); border:1px solid var(--border-card); border-radius:6px; font-size:12px; color:var(--text-dim); max-width:220px; }
+.preview-area .video-preview-tag .video-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+.preview-area .video-preview-tag .video-del { cursor:pointer; color:var(--text-dim); padding:0 2px; }
+.preview-area .video-preview-tag .video-del:hover { color:var(--accent); }
 
 /* 图片放大查看 */
 .img-overlay {
@@ -558,6 +562,10 @@ html.light .guest-id.broadcasting { color: #222; }
             <span id="ico-img"></span>
             <input type="file" id="msg-image" accept="image/*" hidden>
           </label>
+          <label class="img-upload-btn" title="上传视频（Live动态）">
+            <span id="ico-video"></span>
+            <input type="file" id="msg-video" accept="video/*" hidden>
+          </label>
           <span class="voice-btn" id="voice-btn" title="录制语音"><span id="ico-mic"></span></span>
           <button class="refresh-btn" id="refresh-btn"><span id="ico-refresh"></span></button>
           <span class="walkie-btn" id="walkie-btn" title="对讲机（按住说话）"
@@ -592,6 +600,7 @@ const ICO = {
   moon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>',
   sun: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>',
   img: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>',
+  video: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M22 8l-6 4 6 4V8z"/></svg>',
   mic: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="1" width="6" height="12" rx="3"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>',
   refresh: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>',
   stop: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>',
@@ -645,6 +654,7 @@ const MOCK_NEWS = [
 let currentUser = null;  // { username, displayName }
 let pendingImage = null;  // base64 preview
 let pendingImageFile = null;  // File object for upload
+let pendingVideoFile = null;  // Video file object for upload
 let lastMessageSnapshot = '';  // 用于检测新消息
 let hasNewMessages = false;  // 标记是否有新消息（监管动态变紫）
 // 在线状态追踪：记录哪些账号在线且订阅了广播
@@ -711,6 +721,7 @@ function renderNews(containerId, dateId, userMessages, isAutoRefresh) {
     }
     if (summaryContent) msgHtml += `<p>${summaryContent}</p>`;
     if (newestMsg.image_url) msgHtml += `<span class="img-toggle" onclick="toggleImg(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg> 查看图片</span><div class="img-fold"><img src="${newestMsg.image_url}" alt="配图" onclick="showOverlay(this.src)"></div>`;
+    if (newestMsg.video_url) msgHtml += `<span class="img-toggle" onclick="toggleVideo(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M22 8l-6 4 6 4V8z"/></svg> 查看视频</span><div class="img-fold"><video controls preload="metadata" playsinline style="max-width:100%;border-radius:6px;"><source src="${newestMsg.video_url}" type="video/mp4">您的浏览器不支持视频播放</video></div>`;
     if (newestMsg.audio_url) msgHtml += `<audio controls src="${newestMsg.audio_url}" preload="metadata">您的浏览器不支持语音播放</audio>`;
     // 爱心复制按钮
     const copyText = newestMsg.text || '';
@@ -743,6 +754,21 @@ function toggleImg(el) {
     el.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg> 收起图片';
   }
 }
+const VIDEO_ICON_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M22 8l-6 4 6 4V8z"/></svg>';
+function toggleVideo(el) {
+  const foldDiv = el.nextElementSibling;
+  if (foldDiv.classList.contains("show")) {
+    foldDiv.classList.remove("show");
+    // 暂停视频
+    const v = foldDiv.querySelector("video");
+    if (v) v.pause();
+    el.innerHTML = VIDEO_ICON_SVG + ' 查看视频';
+  } else {
+    foldDiv.classList.add("show");
+    el.innerHTML = VIDEO_ICON_SVG + ' 收起视频';
+  }
+}
+
 
 // 复制评论到剪贴板
 function copyComment(el, text) {
@@ -793,7 +819,7 @@ async function fetchMessages() {
 }
 
 // 发送留言（最多保留2条，滚动覆盖最旧的）
-async function sendMessage(username, displayName, text, imageUrl, audioUrl) {
+async function sendMessage(username, displayName, text, imageUrl, audioUrl, videoUrl) {
   if (!supabaseClient) throw new Error('Supabase 未初始化');
   // 先插入新留言（不设created_at，让数据库用now()自动填充）
   const { error: insertErr } = await supabaseClient
@@ -803,7 +829,8 @@ async function sendMessage(username, displayName, text, imageUrl, audioUrl) {
       display_name: displayName,
       text: text || '',
       image_url: imageUrl || null,
-      audio_url: audioUrl || null
+      audio_url: audioUrl || null,
+      video_url: videoUrl || null
     });
   if (insertErr) throw insertErr;
   // 插入成功后，查询所有消息（按id排序），只保留最新2条
@@ -839,6 +866,31 @@ async function uploadImage(file, username) {
   const { data, error } = await supabaseClient.storage
     .from('images')
     .upload(fixedPath, file, { contentType: file.type });
+  if (error) throw error;
+  const { data: urlData } = supabaseClient.storage
+    .from('images')
+    .getPublicUrl(fixedPath);
+  return urlData.publicUrl + '?t=' + Date.now();
+}
+
+// 上传视频到 Supabase Storage（共享文件名，任何账号上传都覆盖旧视频）
+async function uploadVideo(file, username) {
+  if (!supabaseClient) throw new Error('Supabase 未初始化');
+  const ext = file.name.split('.').pop().toLowerCase();
+  const fixedPath = `shared_video.${ext || 'mp4'}`;
+
+  // 删除所有旧视频格式
+  const possibleExts = ['mp4', 'mov', 'webm', 'm4v', '3gp', 'mkv'];
+  for (const oldExt of possibleExts) {
+    try {
+      await supabaseClient.storage.from('images').remove([`shared_video.${oldExt}`]);
+    } catch (e) { /* 旧文件不存在则忽略 */ }
+  }
+
+  // 上传新视频
+  const { data, error } = await supabaseClient.storage
+    .from('images')
+    .upload(fixedPath, file, { contentType: file.type || 'video/mp4', upsert: false });
   if (error) throw error;
   const { data: urlData } = supabaseClient.storage
     .from('images')
@@ -993,6 +1045,7 @@ function doLogout() {
   currentUser = null;
   pendingImage = null;
   pendingImageFile = null;
+  pendingVideoFile = null;
   pendingVoiceBlob = null;
   if (mediaRecorder && mediaRecorder.state === 'recording') stopRecording();
   // 退出时清理对讲机和Presence频道，避免残留在线状态
@@ -1021,7 +1074,7 @@ function doLogout() {
 async function doSendMessage() {
   if (!currentUser) return;
   const text = document.getElementById('msg-text').value.trim();
-  if (!text && !pendingImageFile && !pendingVoiceBlob) return;
+  if (!text && !pendingImageFile && !pendingVideoFile && !pendingVoiceBlob) return;
 
   const sendBtn = document.getElementById('send-btn');
   sendBtn.disabled = true;
@@ -1036,13 +1089,19 @@ async function doSendMessage() {
       imageUrl = await uploadImage(pendingImageFile, currentUser.username);
     }
 
+    // 上传视频（如果有，Live动态）
+    let videoUrl = null;
+    if (pendingVideoFile) {
+      videoUrl = await uploadVideo(pendingVideoFile, currentUser.username);
+    }
+
     // 上传语音（如果有）
     if (pendingVoiceBlob) {
       audioUrl = await uploadAudio(pendingVoiceBlob, currentUser.username);
     }
 
     // 发送留言
-    await sendMessage(currentUser.username, currentUser.displayName, text, imageUrl, audioUrl);
+    await sendMessage(currentUser.username, currentUser.displayName, text, imageUrl, audioUrl, videoUrl);
 
     // 通知其他客户端有新消息
     notifyNewMessage();
@@ -1051,10 +1110,14 @@ async function doSendMessage() {
     document.getElementById('msg-text').value = '';
     pendingImage = null;
     pendingImageFile = null;
+    pendingVideoFile = null;
     pendingVoiceBlob = null;
     document.getElementById('preview-area').innerHTML = '';
     document.getElementById('voice-preview').classList.remove('show');
     document.getElementById('voice-dur').textContent = '';
+    // 重置 file input
+    const imgInput = document.getElementById('msg-image'); if (imgInput) imgInput.value = '';
+    const vidInput = document.getElementById('msg-video'); if (vidInput) vidInput.value = '';
 
     // 刷新留言
     hasNewMessages = false;  // 发送消息后恢复颜色
@@ -1078,9 +1141,56 @@ function handleImageSelect(e) {
   const reader = new FileReader();
   reader.onload = function(ev) {
     pendingImage = ev.target.result;
-    document.getElementById('preview-area').innerHTML = `<img src="${pendingImage}" alt="预览">`;
+    renderPendingPreview();
   };
   reader.readAsDataURL(file);
+}
+
+function handleVideoSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  // 简单体积限制：提示>30MB视频
+  if (file.size > 30 * 1024 * 1024) {
+    if (!confirm('视频文件较大（>30MB），上传可能较慢或失败，是否继续？')) {
+      e.target.value = '';
+      return;
+    }
+  }
+  pendingVideoFile = file;
+  renderPendingPreview();
+}
+
+// 渲染图片+视频预览（追加式，互不覆盖）
+function renderPendingPreview() {
+  const area = document.getElementById('preview-area');
+  let html = '';
+  if (pendingImage && pendingImageFile) {
+    html += `<img src="${pendingImage}" alt="预览" style="cursor:pointer;" onclick="removePendingImage()" title="点击移除图片">`;
+  }
+  if (pendingVideoFile) {
+    const vidUrl = URL.createObjectURL(pendingVideoFile);
+    html += `<div class="video-preview-tag">`
+      + `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M22 8l-6 4 6 4V8z"/></svg>`
+      + `<span class="video-name" title="${pendingVideoFile.name}">${pendingVideoFile.name}</span>`
+      + `<span class="video-del" onclick="removePendingVideo()" title="移除视频"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span>`
+      + `</div>`;
+    // 缓存 objectURL 供后续释放（避免内存泄漏）
+    if (window._pendingVideoObjUrl) URL.revokeObjectURL(window._pendingVideoObjUrl);
+    window._pendingVideoObjUrl = vidUrl;
+  }
+  area.innerHTML = html;
+}
+function removePendingImage() {
+  pendingImage = null;
+  pendingImageFile = null;
+  const imgInput = document.getElementById('msg-image'); if (imgInput) imgInput.value = '';
+  renderPendingPreview();
+}
+function removePendingVideo() {
+  if (window._pendingVideoObjUrl) { URL.revokeObjectURL(window._pendingVideoObjUrl); window._pendingVideoObjUrl = null; }
+  pendingVideoFile = null;
+  const vidInput = document.getElementById('msg-video'); if (vidInput) vidInput.value = '';
+  renderPendingPreview();
 }
 
 // 加载公共页（只显示新闻，不显示行业评论）
@@ -1402,7 +1512,7 @@ function stopPTT(e) {
 // ===== 初始化 =====
 document.addEventListener('DOMContentLoaded', async () => {
   // 注入SVG图标
-  const icoMap = {'ico-img': ICO.img, 'ico-mic': ICO.mic, 'ico-refresh': ICO.refresh, 'ico-del': ICO.del, 'ico-walkie': ICO.walkie};
+  const icoMap = {'ico-img': ICO.img, 'ico-video': ICO.video, 'ico-mic': ICO.mic, 'ico-refresh': ICO.refresh, 'ico-del': ICO.del, 'ico-walkie': ICO.walkie};
   Object.entries(icoMap).forEach(([id, svg]) => { const el = document.getElementById(id); if (el) el.innerHTML = svg; });
 
   // 对讲机事件绑定
@@ -1439,6 +1549,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSendMessage(); }
   });
   document.getElementById('msg-image').addEventListener('change', handleImageSelect);
+  document.getElementById('msg-video').addEventListener('change', handleVideoSelect);
   document.getElementById('voice-btn').addEventListener('click', startRecording);
   document.getElementById('rec-stop').addEventListener('click', stopRecording);
   document.getElementById('voice-del').addEventListener('click', cancelVoice);
@@ -1622,6 +1733,7 @@ function gkRenderNews(messages) {
     }
     if (summaryContent) msgHtml += `<p>${summaryContent}</p>`;
     if (newestMsg.image_url) msgHtml += `<span class="img-toggle" onclick="toggleImg(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg> 查看图片</span><div class="img-fold"><img src="${newestMsg.image_url}" alt="配图" onclick="showOverlay(this.src)"></div>`;
+    if (newestMsg.video_url) msgHtml += `<span class="img-toggle" onclick="toggleVideo(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M22 8l-6 4 6 4V8z"/></svg> 查看视频</span><div class="img-fold"><video controls preload="metadata" playsinline style="max-width:100%;border-radius:6px;"><source src="${newestMsg.video_url}" type="video/mp4">您的浏览器不支持视频播放</video></div>`;
     if (newestMsg.audio_url) msgHtml += `<audio controls src="${newestMsg.audio_url}" preload="metadata">您的浏览器不支持语音播放</audio>`;
     const copyText = newestMsg.text || '';
     msgHtml += `<span class="copy-heart" onclick="copyComment(this, '${escapeHtml(copyText).replace(/'/g, "\\'")}')" title="复制评论">${getCopyIcon()}</span>`;
@@ -1657,20 +1769,35 @@ async function cleanupStorage() {
     const { data: files, error } = await supabaseClient.storage.from('images').list('', { limit: 100 });
     if (error) { console.warn('列出存储文件失败:', error); return; }
     if (files && files.length > 0) {
-      // 分离图片和语音文件
-      const imageFiles = files.filter(f => !f.name.startsWith('shared_voice'));
+      // 分离图片、视频和语音文件
+      const imageFiles = files.filter(f => f.name.startsWith('shared_image'));
       const voiceFiles = files.filter(f => f.name.startsWith('shared_voice'));
-      
-      // 删除图片文件
+      const videoFiles = files.filter(f => f.name.startsWith('shared_video'));
+
+      // 图片文件：立即删除（与图片生命周期一致）
       if (imageFiles.length > 0) {
         const imagePaths = imageFiles.map(f => f.name);
         const { error: delErr } = await supabaseClient.storage.from('images').remove(imagePaths);
         if (delErr) console.warn('删除图片文件失败:', delErr);
         else console.log(`已清理 ${imagePaths.length} 个图片文件`);
       }
-      
-      // 语音文件：只删除超过2小时的旧语音（给播放留足时间）
+
       const twoHoursAgo = Date.now() - 2 * 3600000;
+
+      // 视频文件：只删除超过2小时的旧视频（给播放留足时间，同语音策略）
+      const oldVideoFiles = videoFiles.filter(f => new Date(f.created_at).getTime() < twoHoursAgo);
+      if (oldVideoFiles.length > 0) {
+        const videoPaths = oldVideoFiles.map(f => f.name);
+        await supabaseClient.storage.from('images').remove(videoPaths);
+        // 旧视频删除后，置空对应的video_url
+        const { error: msgErr } = await supabaseClient
+          .from('messages')
+          .update({ video_url: null })
+          .not('video_url', 'is', null);
+        if (msgErr) console.warn('清理视频链接失败:', msgErr);
+      }
+
+      // 语音文件：只删除超过2小时的旧语音（给播放留足时间）
       const oldVoiceFiles = voiceFiles.filter(f => new Date(f.created_at).getTime() < twoHoursAgo);
       if (oldVoiceFiles.length > 0) {
         const voicePaths = oldVoiceFiles.map(f => f.name);
@@ -1683,7 +1810,7 @@ async function cleanupStorage() {
         if (msgErr) console.warn('清理语音链接失败:', msgErr);
       }
     }
-    // 只置空image_url（图片已删除），保留audio_url直到语音文件过期
+    // 只置空image_url（图片已删除），保留audio_url和video_url直到对应媒体过期
     const { error: msgErr } = await supabaseClient
       .from('messages')
       .update({ image_url: null })
