@@ -429,7 +429,7 @@ html.light .guest-id.broadcasting { color: #222; }
 @media (max-width: 640px) {
   .newspaper-header h1 { font-size: 22px; }
 }
-  
+
 /* ===== 语音房间 ===== */
 .voice-room-wrap { display:flex; flex-direction:column; align-items:center; gap:16px; padding:20px 0; }
 .voice-join-btn { display:flex; align-items:center; gap:8px; padding:12px 28px; font-size:15px; color:#fff; background:var(--accent); border:none; border-radius:24px; cursor:pointer; transition:all 0.2s; }
@@ -443,7 +443,8 @@ html.light .guest-id.broadcasting { color: #222; }
 @keyframes voicePulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
 #jitsi-container { width:100%; border-radius:8px; overflow:hidden; background:var(--bg-dark); }
 #jitsi-container iframe { width:100%!important; height:500px!important; border:none!important; border-radius:8px; }
-</style>
+
+  </style>
 </head>
 <body>
 
@@ -522,8 +523,6 @@ html.light .guest-id.broadcasting { color: #222; }
         <div class="iframe-wrapper">
           <iframe id="ai-assistant-iframe" src="https://bailiangroup.aiforce.cloud/app/app_4kebg037d5txp" style="width:100%;border:none;border-radius:8px;background:var(--bg-dark);"></iframe>
         </div>
-    
-      </div>
       </div>
       <div class="tab-panel" id="tab-video">
         <!-- 右边tab的新闻+评论（跟左边一样） -->
@@ -556,16 +555,6 @@ html.light .guest-id.broadcasting { color: #222; }
             <div class="gk-actions">
               <button class="gk-btn gk-btn-danger" onclick="gomokuLeave()">认输离开</button>
             </div>
-          </div>
-          <!-- 结算 -->
-          <div id="gk-result" style="display:none;">
-            <h3 class="gk-title" id="gk-result-text"></h3>
-            <div class="gk-actions">
-              <button class="gk-btn gk-btn-primary" onclick="gomokuBackLobby()">再来一局</button>
-            </div>
-          </div>
-        </div>
-      </div>
       <!-- 语音房间 tab -->
       <div class="tab-panel" id="tab-voice">
         <div class="voice-room-wrap">
@@ -576,9 +565,20 @@ html.light .guest-id.broadcasting { color: #222; }
           </button>
           <div id="jitsi-container" style="display:none;"></div>
         </div>
+      </div>
+          </div>
+          <!-- 结算 -->
+          <div id="gk-result" style="display:none;">
+            <h3 class="gk-title" id="gk-result-text"></h3>
+            <div class="gk-actions">
+              <button class="gk-btn gk-btn-primary" onclick="gomokuBackLobby()">再来一局</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
-      <div class="message-input-area">
+    <div class="message-input-area">
       <div class="input-row">
         <div class="input-col">
           <textarea id="msg-text" placeholder="写点什么..." maxlength="200" rows="2"></textarea>
@@ -622,7 +622,6 @@ html.light .guest-id.broadcasting { color: #222; }
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Jitsi Meet External API -->
   <script src="https://meet.jit.si/external_api.js"></script>
-
 
   <script>
 // ===== SVG 图标（简约商务线条风） =====
@@ -2149,7 +2148,7 @@ function gomokuBackLobby() {
   gkShow('lobby');
 }
 
-  
+
 // ===== 语音房间 (Jitsi Meet) =====
 let jitsiApi = null;
 let voiceJoined = false;
@@ -2238,6 +2237,6 @@ function updateVoiceUI(joined) {
   }
 }
 
-</script>
+  </script>
 </body>
 </html>
