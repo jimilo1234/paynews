@@ -555,6 +555,16 @@ html.light .guest-id.broadcasting { color: #222; }
             <div class="gk-actions">
               <button class="gk-btn gk-btn-danger" onclick="gomokuLeave()">认输离开</button>
             </div>
+          </div>
+          <!-- 结算 -->
+          <div id="gk-result" style="display:none;">
+            <h3 class="gk-title" id="gk-result-text"></h3>
+            <div class="gk-actions">
+              <button class="gk-btn gk-btn-primary" onclick="gomokuBackLobby()">再来一局</button>
+            </div>
+          </div>
+        </div>
+      </div>
       <!-- 语音房间 tab -->
       <div class="tab-panel" id="tab-voice">
         <div class="voice-room-wrap">
@@ -564,16 +574,6 @@ html.light .guest-id.broadcasting { color: #222; }
             <span>加入语音房间</span>
           </button>
           <div id="jitsi-container" style="display:none;"></div>
-        </div>
-      </div>
-          </div>
-          <!-- 结算 -->
-          <div id="gk-result" style="display:none;">
-            <h3 class="gk-title" id="gk-result-text"></h3>
-            <div class="gk-actions">
-              <button class="gk-btn gk-btn-primary" onclick="gomokuBackLobby()">再来一局</button>
-            </div>
-          </div>
         </div>
       </div>
     </div>
