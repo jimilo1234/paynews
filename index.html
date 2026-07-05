@@ -2175,12 +2175,12 @@ function joinVoiceRoom() {
     userInfo: { displayName: displayName },
     configOverwrite: {
       startWithAudioMuted: false,
-      startWithVideoMuted: true,
-      disableVideo: true,
+      startWithVideoMuted: false,
+      disableVideo: false,
       prejoinPageEnabled: false,
       enableClosePage: false,
       toolbarButtons: [
-        'microphone', 'hangup', 'chat', 'settings', 'fullscreen', 'tileview'
+        'microphone', 'camera', 'hangup', 'chat', 'settings', 'fullscreen', 'tileview'
       ],
       toolbarConfig: {
         initialTimeout: 5000
