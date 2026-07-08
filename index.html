@@ -2254,6 +2254,7 @@ async function joinVoiceRoom() {
     voiceJoined = true;
     micEnabled = true;
     updateVoiceUI(true);
+    updateVoiceUserCount();
     document.getElementById('peerjs-voice-area').classList.add('active');
 
   } catch(e) {
