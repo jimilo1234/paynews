@@ -2183,6 +2183,7 @@ let remotePeers = {};
 let remoteStreams = {};
 let heartbeatTimer = null;
 let discoveryTimer = null;
+let outgoingCalls = {};
 
 const ROOM_ID = 'paynews_room_2026';
 let myPeerId = '';
@@ -2197,6 +2198,9 @@ function toggleVoiceRoom() {
 
 async function joinVoiceRoom() {
   try {
+    // 显示连接中状态
+    const status = document.getElementById('voice-status-line');
+    if (status) status.innerHTML = '<span class="dot on"></span>连接中...';
     // 获取本地音频流
     localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
 
@@ -2224,9 +2228,16 @@ async function joinVoiceRoom() {
       discoveryTimer = setInterval(() => discoverPeers(id), 5000);
       // 立即执行一次发现
       await discoverPeers(id);
+      // PeerJS 连接成功，更新 UI
+      voiceJoined = true;
+      micEnabled = true;
+      updateVoiceUI(true);
+      updateVoiceUserCount();
+      document.getElementById('peerjs-voice-area').classList.add('active');
     });
 
     peer.on('call', (call) => {
+      if (remotePeers[call.peer] || outgoingCalls[call.peer]) return;
       console.log('收到来电:', call.peer);
       call.answer(localStream);
       handleCallStream(call);
@@ -2251,11 +2262,6 @@ async function joinVoiceRoom() {
       }
     });
 
-    voiceJoined = true;
-    micEnabled = true;
-    updateVoiceUI(true);
-    updateVoiceUserCount();
-    document.getElementById('peerjs-voice-area').classList.add('active');
 
   } catch(e) {
     console.error('加入语音房间失败:', e);
@@ -2331,6 +2337,7 @@ function callPeer(remoteId) {
   const currentStream = screenStream || localStream;
   const call = peer.call(remoteId, currentStream);
   if (call) {
+    outgoingCalls[remoteId] = call;
     handleCallStream(call);
   }
 }
@@ -2405,6 +2412,7 @@ function playRemoteStream(peerId, stream) {
 function removeRemotePeer(peerId) {
   delete remotePeers[peerId];
   delete remoteStreams[peerId];
+  delete outgoingCalls[peerId];
   const container = document.getElementById('peer-' + peerId);
   if (container) container.remove();
   updateVoiceUserCount();
@@ -2565,6 +2573,27 @@ function updateVoiceUI(joined) {
     status.innerHTML = '<span class="dot off"></span>未连接';
   }
 }
+
+// 页面关闭/刷新时清理语音房间记录
+window.addEventListener('beforeunload', () => {
+  if (myPeerId) {
+    try {
+      // 使用 sendBeacon 确保在页面卸载时也能发送请求
+      const url = `https://wwxzycfdfyyljkjfcbjt.supabase.co/rest/v1/voice_peers?id=eq.${myPeerId}`;
+      navigator.sendBeacon(url, new Blob([], { type: 'application/json' }));
+    } catch(e) {}
+    // 备用：直接 fetch DELETE
+    try {
+      fetch(`https://wwxzycfdfyyljkjfcbjt.supabase.co/rest/v1/voice_peers?id=eq.${myPeerId}`, {
+        method: 'DELETE',
+        headers: {
+          'apikey': 'sb_publishable_0WePrzUk-LVH3TK7RFT_fQ_5r3C0dvP',
+          'Authorization': 'Bearer sb_publishable_0WePrzUk-LVH3TK7RFT_fQ_5r3C0dvP'
+        }
+      });
+    } catch(e) {}
+  }
+});
 
 function updateVoiceUserCount() {
   const countEl = document.getElementById('voice-user-count');
