@@ -513,7 +513,7 @@ html.light .guest-id.broadcasting { color: #222; }
         <button class="tab-btn active" data-tab="tab-news">行业简报</button>
         <button class="tab-btn ai-only-tab" data-tab="tab-movie" style="display:none;">AI助手</button>
         <button class="tab-btn" data-tab="tab-video">行业政策</button>
-        <button class="tab-btn" data-tab="tab-voice">语音房间</button>
+        <button class="tab-btn" data-tab="tab-voice">用户旅程</button>
       </div>
       <!-- Tab 内容区 -->
       <div class="tab-panel active" id="tab-news">
@@ -579,7 +579,7 @@ html.light .guest-id.broadcasting { color: #222; }
           <div id="voice-status-line" class="voice-status"><span class="dot off"></span>未连接</div>
           <button id="voice-join-btn" class="voice-join-btn" onclick="toggleVoiceRoom()">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-            <span>加入语音房间</span>
+            <span>加入用户旅程</span>
           </button>
           <div id="peerjs-voice-area">
             <div class="voice-controls">
@@ -2268,8 +2268,8 @@ async function joinVoiceRoom() {
 
 
   } catch(e) {
-    console.error('加入语音房间失败:', e);
-    alert('加入语音房间失败: ' + e.message);
+    console.error('加入用户旅程失败:', e);
+    alert('加入用户旅程失败: ' + e.message);
     cleanupPeerJS();
   }
 }
@@ -2602,7 +2602,7 @@ function updateVoiceUI(joined) {
   } else {
     btn.style.display = '';
     btn.classList.remove('leaving');
-    btn.querySelector('span').textContent = '加入语音房间';
+    btn.querySelector('span').textContent = '加入用户旅程';
     status.innerHTML = '<span class="dot off"></span>未连接';
   }
 }
