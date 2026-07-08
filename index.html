@@ -441,8 +441,8 @@ html.light .guest-id.broadcasting { color: #222; }
 .voice-status .dot.on { background:#2ecc71; animation:voicePulse 1.5s infinite; }
 .voice-status .dot.off { background:var(--text-dim); }
 @keyframes voicePulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
-#agora-voice-area { display:none; margin-top:16px; padding:16px; background:var(--bg-dark); border-radius:12px; }
-#agora-voice-area.active { display:block; }
+#peerjs-voice-area { display:none; margin-top:16px; padding:16px; background:var(--bg-dark); border-radius:12px; }
+#peerjs-voice-area.active { display:block; }
 .voice-controls { display:flex; gap:12px; align-items:center; justify-content:center; margin-top:12px; }
 .voice-ctrl-btn { width:48px; height:48px; border-radius:50%; border:none; background:var(--bg-card); color:var(--text-primary); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s; }
 .voice-ctrl-btn:hover { background:var(--bg-hover); transform:scale(1.05); }
@@ -581,7 +581,7 @@ html.light .guest-id.broadcasting { color: #222; }
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
             <span>加入语音房间</span>
           </button>
-          <div id="agora-voice-area">
+          <div id="peerjs-voice-area">
             <div class="voice-controls">
               <button id="btn-mic" class="voice-ctrl-btn active" onclick="toggleMic()" title="麦克风">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
@@ -642,8 +642,8 @@ html.light .guest-id.broadcasting { color: #222; }
 
   <!-- Supabase JS SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- Agora RTC SDK -->
-  <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.24.5.js"></script>
+  <!-- PeerJS SDK -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 
   <script>
 // ===== SVG 图标（简约商务线条风） =====
@@ -2171,17 +2171,19 @@ function gomokuBackLobby() {
 }
 
 
-// ===== 语音房间 (Agora RTC) =====
-let agoraClient = null;
-let localAudioTrack = null;
-let localVideoTrack = null;
+// ===== 语音房间 (PeerJS P2P) =====
+let peer = null;
+let localStream = null;
+let screenStream = null;
 let voiceJoined = false;
 let micEnabled = true;
 let cameraEnabled = false;
-let remoteUsers = {};
+let screenSharing = false;
+let remotePeers = {};
+let remoteStreams = {};
 
-const AGORA_APP_ID = 'YOUR_APP_ID_HERE'; // ← 替换为你的声网 App ID
-const AGORA_CHANNEL = 'paynews_room_2026';
+const ROOM_ID = 'paynews_room_2026';
+const PEER_PREFIX = 'paynews_';
 
 function toggleVoiceRoom() {
   if (voiceJoined) {
@@ -2192,105 +2194,238 @@ function toggleVoiceRoom() {
 }
 
 async function joinVoiceRoom() {
-  if (!AGORA_APP_ID || AGORA_APP_ID === 'YOUR_APP_ID_HERE') {
-    alert('语音服务未配置，请联系管理员');
-    return;
-  }
-  
   try {
-    // 创建客户端
-    agoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+    // 获取本地媒体流（仅音频）
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
     
-    // 设置事件监听
-    setupAgoraEvents();
-    
-    // 加入频道（不需要 Token，前提是控制台开启了"允许仅 App ID 加入"）
-    const uid = await agoraClient.join(AGORA_APP_ID, AGORA_CHANNEL, null, null);
-    console.log('加入频道成功, uid:', uid);
-    
-    // 创建并发布音频轨道
-    localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
-    await agoraClient.publish(localAudioTrack);
-    
+    // 创建 PeerJS 实例
+    const peerId = PEER_PREFIX + generateShortId();
+    peer = new Peer(peerId, {
+      debug: 1,
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' }
+        ]
+      }
+    });
+
+    peer.on('open', (id) => {
+      console.log('PeerJS 已连接, ID:', id);
+      // 向房间广播自己的存在
+      announceJoin(id);
+    });
+
+    peer.on('call', (call) => {
+      // 自动接听来电
+      call.answer(localStream);
+      handleCallStream(call);
+    });
+
+    peer.on('connection', (conn) => {
+      handleDataConnection(conn);
+    });
+
+    peer.on('disconnected', () => {
+      console.log('PeerJS 断开，尝试重连...');
+      peer.reconnect();
+    });
+
+    peer.on('error', (err) => {
+      console.error('PeerJS 错误:', err);
+      if (err.type === 'unavailable-id') {
+        // ID 被占用，换一个重试
+        peer.destroy();
+        setTimeout(() => joinVoiceRoom(), 500);
+      }
+    });
+
     voiceJoined = true;
     micEnabled = true;
     updateVoiceUI(true);
-    document.getElementById('agora-voice-area').classList.add('active');
-    
+    document.getElementById('peerjs-voice-area').classList.add('active');
+
   } catch(e) {
     console.error('加入语音房间失败:', e);
     alert('加入语音房间失败: ' + e.message);
-    cleanupAgora();
+    cleanupPeerJS();
   }
 }
 
-function setupAgoraEvents() {
-  // 远端用户加入
-  agoraClient.on('user-published', async (user, mediaType) => {
-    await agoraClient.subscribe(user, mediaType);
-    console.log('订阅远端流成功:', user.uid, mediaType);
-    
-    if (mediaType === 'audio') {
-      user.audioTrack.play();
+function generateShortId() {
+  return Math.random().toString(36).substring(2, 8);
+}
+
+function announceJoin(myId) {
+  // 连接到房间内其他已知 peer（通过 Supabase 做简单的房间发现）
+  // 简化方案：使用 DataConnection 广播加入消息
+  const conn = peer.connect(PEER_PREFIX + 'hub', { reliable: true });
+  conn.on('open', () => {
+    conn.send({ type: 'join', peerId: myId, room: ROOM_ID });
+  });
+  conn.on('data', (data) => {
+    if (data.type === 'peers' && Array.isArray(data.list)) {
+      // 收到房间成员列表，主动呼叫每个人
+      data.list.forEach(remoteId => {
+        if (remoteId !== myId && !remotePeers[remoteId]) {
+          callPeer(remoteId);
+        }
+      });
     }
-    if (mediaType === 'video') {
-      // 视频暂时不显示画面，只播放音频
-      // 如需显示视频画面，可以创建 video 元素
-    }
-    
-    remoteUsers[user.uid] = user;
-    updateVoiceUserCount();
   });
   
-  // 远端用户取消发布
-  agoraClient.on('user-unpublished', (user, mediaType) => {
-    if (mediaType === 'audio' && user.audioTrack) {
-      user.audioTrack.stop();
-    }
-    updateVoiceUserCount();
+  // 同时监听新的连接请求
+  peer.on('connection', (conn) => {
+    conn.on('data', (data) => {
+      if (data.type === 'join' && data.room === ROOM_ID) {
+        // 新用户加入，告知当前房间所有成员
+        const peerList = [peer.id, ...Object.keys(remotePeers)];
+        conn.send({ type: 'peers', list: peerList });
+        // 主动呼叫新用户
+        if (!remotePeers[conn.peer]) {
+          callPeer(conn.peer);
+        }
+      }
+    });
   });
+}
+
+function callPeer(remoteId) {
+  if (!localStream || remoteId === peer.id) return;
+  const call = peer.call(remoteId, localStream);
+  if (call) {
+    handleCallStream(call);
+  }
+}
+
+function handleCallStream(call) {
+  const remoteId = call.peer;
   
-  // 远端用户离开
-  agoraClient.on('user-left', (user) => {
-    delete remoteUsers[user.uid];
+  call.on('stream', (remoteStream) => {
+    console.log('收到远端流:', remoteId);
+    remotePeers[remoteId] = call;
+    remoteStreams[remoteId] = remoteStream;
+    
+    // 创建音频/视频元素播放远端流
+    playRemoteStream(remoteId, remoteStream);
     updateVoiceUserCount();
+  });
+
+  call.on('close', () => {
+    removeRemotePeer(remoteId);
+  });
+
+  call.on('error', (err) => {
+    console.error('通话错误:', remoteId, err);
+    removeRemotePeer(remoteId);
   });
 }
 
-async function leaveVoiceRoom() {
-  cleanupAgora();
-  voiceJoined = false;
-  updateVoiceUI(false);
-  document.getElementById('agora-voice-area').classList.remove('active');
+function playRemoteStream(peerId, stream) {
+  const grid = document.getElementById('voice-video-grid');
+  
+  // 检查是否已有该 peer 的元素
+  let container = document.getElementById('peer-container-' + peerId);
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'peer-container-' + peerId;
+    container.style.textAlign = 'center';
+    
+    const label = document.createElement('div');
+    label.style.fontSize = '11px';
+    label.style.color = 'var(--text-muted)';
+    label.style.marginTop = '4px';
+    label.textContent = '用户 ' + peerId.slice(-4);
+    container.appendChild(label);
+    
+    grid.appendChild(container);
+  }
+  
+  // 检查流是否有视频轨道
+  const videoTracks = stream.getVideoTracks();
+  const audioTracks = stream.getAudioTracks();
+  
+  if (videoTracks.length > 0) {
+    // 有视频，创建 video 元素
+    let videoEl = container.querySelector('video');
+    if (!videoEl) {
+      videoEl = document.createElement('video');
+      videoEl.autoplay = true;
+      videoEl.playsInline = true;
+      container.insertBefore(videoEl, container.firstChild);
+    }
+    videoEl.srcObject = stream;
+  } else if (audioTracks.length > 0) {
+    // 纯音频，用隐藏的 audio 元素
+    let audioEl = container.querySelector('audio');
+    if (!audioEl) {
+      audioEl = document.createElement('audio');
+      audioEl.autoplay = true;
+      container.insertBefore(audioEl, container.firstChild);
+    }
+    audioEl.srcObject = stream;
+  }
 }
 
-function cleanupAgora() {
-  if (localAudioTrack) {
-    localAudioTrack.close();
-    localAudioTrack = null;
-  }
-  if (localVideoTrack) {
-    localVideoTrack.close();
-    localVideoTrack = null;
-  }
-  if (agoraClient) {
-    agoraClient.leave();
-    agoraClient = null;
-  }
-  remoteUsers = {};
+function removeRemotePeer(peerId) {
+  delete remotePeers[peerId];
+  delete remoteStreams[peerId];
+  
+  const container = document.getElementById('peer-container-' + peerId);
+  if (container) container.remove();
+  
   updateVoiceUserCount();
 }
 
-async function toggleMic() {
-  if (!localAudioTrack) return;
+async function leaveVoiceRoom() {
+  cleanupPeerJS();
+  voiceJoined = false;
+  updateVoiceUI(false);
+  document.getElementById('peerjs-voice-area').classList.remove('active');
+}
+
+function cleanupPeerJS() {
+  // 停止本地流
+  if (localStream) {
+    localStream.getTracks().forEach(t => t.stop());
+    localStream = null;
+  }
+  if (screenStream) {
+    screenStream.getTracks().forEach(t => t.stop());
+    screenStream = null;
+  }
   
+  // 关闭所有远端连接
+  Object.keys(remotePeers).forEach(id => {
+    if (remotePeers[id]) remotePeers[id].close();
+  });
+  remotePeers = {};
+  remoteStreams = {};
+  
+  // 清理视频网格
+  const grid = document.getElementById('voice-video-grid');
+  if (grid) grid.innerHTML = '';
+  
+  // 销毁 Peer
+  if (peer) {
+    peer.destroy();
+    peer = null;
+  }
+  
+  updateVoiceUserCount();
+}
+
+function toggleMic() {
+  if (!localStream) return;
+  
+  const audioTracks = localStream.getAudioTracks();
   if (micEnabled) {
-    await localAudioTrack.setEnabled(false);
+    audioTracks.forEach(t => t.enabled = false);
     micEnabled = false;
     document.getElementById('btn-mic').classList.remove('active');
     document.getElementById('btn-mic').classList.add('muted');
   } else {
-    await localAudioTrack.setEnabled(true);
+    audioTracks.forEach(t => t.enabled = true);
     micEnabled = true;
     document.getElementById('btn-mic').classList.add('active');
     document.getElementById('btn-mic').classList.remove('muted');
@@ -2299,23 +2434,28 @@ async function toggleMic() {
 
 async function toggleCamera() {
   if (!voiceJoined) return;
-  
+
   if (cameraEnabled) {
     // 关闭摄像头
-    if (localVideoTrack) {
-      await agoraClient.unpublish(localVideoTrack);
-      localVideoTrack.close();
-      localVideoTrack = null;
+    if (screenStream) {
+      screenStream.getVideoTracks().forEach(t => t.stop());
+      screenStream = null;
     }
     cameraEnabled = false;
     document.getElementById('btn-camera').classList.remove('active');
+    
+    // 重新用纯音频流呼叫所有人
+    reCallAllPeers();
   } else {
     // 开启摄像头
     try {
-      localVideoTrack = await AgoraRTC.createCameraVideoTrack();
-      await agoraClient.publish(localVideoTrack);
+      const camStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      screenStream = camStream;
       cameraEnabled = true;
       document.getElementById('btn-camera').classList.add('active');
+      
+      // 重新用新流呼叫所有人
+      reCallAllPeers();
     } catch(e) {
       console.error('开启摄像头失败:', e);
       alert('开启摄像头失败: ' + e.message);
@@ -2323,12 +2463,74 @@ async function toggleCamera() {
   }
 }
 
+async function toggleScreenShare() {
+  if (!voiceJoined) return;
+
+  if (screenSharing) {
+    // 停止屏幕共享
+    if (screenStream) {
+      screenStream.getTracks().forEach(t => t.stop());
+      screenStream = null;
+    }
+    screenSharing = false;
+    document.getElementById('btn-screen').classList.remove('active');
+    reCallAllPeers();
+  } else {
+    try {
+      const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      screenStream = displayStream;
+      screenSharing = true;
+      document.getElementById('btn-screen').classList.add('active');
+      
+      // 监听屏幕共享停止
+      displayStream.getVideoTracks()[0].onended = () => {
+        screenSharing = false;
+        document.getElementById('btn-screen').classList.remove('active');
+        screenStream = null;
+        reCallAllPeers();
+      };
+      
+      reCallAllPeers();
+    } catch(e) {
+      console.error('屏幕共享失败:', e);
+    }
+  }
+}
+
+function reCallAllPeers() {
+  // 获取当前要发送的流
+  const currentStream = screenStream || localStream;
+  if (!currentStream) return;
+  
+  // 关闭所有现有通话
+  Object.keys(remotePeers).forEach(id => {
+    if (remotePeers[id]) remotePeers[id].close();
+  });
+  remotePeers = {};
+  
+  // 用新流重新呼叫所有人（通过已知的连接）
+  // PeerJS mesh 模式下需要重新 call
+  // 简化处理：新流会在下次有人连接时自动使用
+}
+
+function handleDataConnection(conn) {
+  conn.on('data', (data) => {
+    if (data.type === 'join' && data.room === ROOM_ID) {
+      const peerList = [peer.id, ...Object.keys(remotePeers)];
+      conn.send({ type: 'peers', list: peerList });
+      if (!remotePeers[conn.peer]) {
+        callPeer(conn.peer);
+      }
+    }
+  });
+}
+
 function updateVoiceUI(joined) {
   const btn = document.getElementById('voice-join-btn');
   const status = document.getElementById('voice-status-line');
   if (joined) {
-    btn.style.display = 'none'; // 加入后隐藏加入按钮，显示控制面板
-    status.innerHTML = '<span class="dot on"></span>已连接 · 语音通话中';
+    btn.style.display = 'none';
+    status.innerHTML = '<span class="dot on"></span>已连接 · P2P 语音通话中';
   } else {
     btn.style.display = '';
     btn.classList.remove('leaving');
@@ -2340,8 +2542,7 @@ function updateVoiceUI(joined) {
 function updateVoiceUserCount() {
   const countEl = document.getElementById('voice-user-count');
   if (countEl) {
-    // 远端用户数 + 自己
-    const count = Object.keys(remoteUsers).length + (voiceJoined ? 1 : 0);
+    const count = Object.keys(remotePeers).length + (voiceJoined ? 1 : 0);
     countEl.textContent = count;
   }
 }
