@@ -586,6 +586,9 @@ html.light .guest-id.broadcasting { color: #222; }
               <button id="btn-mic" class="voice-ctrl-btn active" onclick="toggleMic()" title="麦克风">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
               </button>
+              <button id="btn-speaker" class="voice-ctrl-btn active" onclick="toggleSpeaker()" title="扬声器">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+              </button>
               <button id="btn-camera" class="voice-ctrl-btn" onclick="toggleCamera()" title="摄像头">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
               </button>
@@ -2179,6 +2182,7 @@ let voiceJoined = false;
 let micEnabled = true;
 let cameraEnabled = false;
 let screenSharing = false;
+let speakerEnabled = true;
 let remotePeers = {};
 let remoteStreams = {};
 let heartbeatTimer = null;
@@ -2394,6 +2398,7 @@ function playRemoteStream(peerId, stream) {
       videoEl = document.createElement('video');
       videoEl.autoplay = true;
       videoEl.playsInline = true;
+      videoEl.muted = !speakerEnabled;
       container.insertBefore(videoEl, container.firstChild);
     }
     videoEl.srcObject = stream;
@@ -2403,6 +2408,7 @@ function playRemoteStream(peerId, stream) {
     if (!audioEl) {
       audioEl = document.createElement('audio');
       audioEl.autoplay = true;
+      audioEl.muted = !speakerEnabled;
       container.insertBefore(audioEl, container.firstChild);
     }
     audioEl.srcObject = stream;
@@ -2477,6 +2483,33 @@ function toggleMic() {
     micEnabled = true;
     document.getElementById('btn-mic').classList.add('active');
     document.getElementById('btn-mic').classList.remove('muted');
+  }
+}
+
+
+function toggleSpeaker() {
+  speakerEnabled = !speakerEnabled;
+  const btn = document.getElementById('btn-speaker');
+  // 静音/取消所有远程媒体元素
+  const grid = document.getElementById('voice-video-grid');
+  if (grid) {
+    grid.querySelectorAll('audio, video').forEach(el => {
+      el.muted = !speakerEnabled;
+    });
+  }
+  // 也处理 remote-audio-container
+  const remoteContainer = document.getElementById('remote-audio-container');
+  if (remoteContainer) {
+    remoteContainer.querySelectorAll('audio').forEach(el => {
+      el.muted = !speakerEnabled;
+    });
+  }
+  if (speakerEnabled) {
+    btn.classList.remove('muted');
+    btn.classList.add('active');
+  } else {
+    btn.classList.remove('active');
+    btn.classList.add('muted');
   }
 }
 
