@@ -674,6 +674,7 @@ const MOCK_NEWS = [
 
 // ===== 全局状态 =====
 let currentUser = null;  // { username, displayName }
+let loginTimeoutId = null;  // 0110账号2小时自动退出定时器
 let pendingImage = null;  // base64 preview
 let pendingImageFile = null;  // File object for upload
 let pendingVideoFile = null;  // Video file object for upload
@@ -1057,6 +1058,15 @@ async function doLogin() {
     // 订阅messages表实时变更，新消息立即刷新评论
     subscribeMessageChanges();
 
+    // 0110账号登录满2小时自动退出
+    if (account === '0110') {
+      if (loginTimeoutId) clearTimeout(loginTimeoutId);
+      loginTimeoutId = setTimeout(() => {
+        console.log('[限时] 0110账号登录已满2小时，自动退出');
+        doLogout();
+      }, 2 * 60 * 60 * 1000);
+    }
+
   } catch (err) {
     console.error('登录失败:', err);
     errorEl.textContent = '活动火热，稍后再试';
@@ -1067,6 +1077,8 @@ async function doLogin() {
 }
 
 function doLogout() {
+  // 清除0110限时退出定时器
+  if (loginTimeoutId) { clearTimeout(loginTimeoutId); loginTimeoutId = null; }
   currentUser = null;
   pendingImage = null;
   pendingImageFile = null;
