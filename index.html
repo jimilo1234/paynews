@@ -1283,19 +1283,39 @@ function autoPlayVoiceMessage(audioUrl) {
   autoPlayAudioQueue.push(audioUrl);
   processAutoPlayQueue();
 }
-function processAutoPlayQueue() {
+async function processAutoPlayQueue() {
   if (autoPlayAudioBusy || autoPlayAudioQueue.length === 0) return;
   autoPlayAudioBusy = true;
   const url = autoPlayAudioQueue.shift();
-  const audio = new Audio(url);
-  audio.playbackRate = 1.0;
-  audio.play().then(() => {
-    console.log('[自动播放] 开始播放语音消息');
-  }).catch(err => {
-    console.warn('[自动播放] 播放失败:', err.message);
-  });
-  audio.onended = () => { autoPlayAudioBusy = false; processAutoPlayQueue(); };
-  audio.onerror = () => { autoPlayAudioBusy = false; processAutoPlayQueue(); };
+  try {
+    // 优先用AudioContext播放（已在用户手势中解锁，不受autoplay限制）
+    if (!walkieAudioCtx) walkieAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (walkieAudioCtx.state === 'suspended') await walkieAudioCtx.resume();
+    const resp = await fetch(url);
+    const arrayBuf = await resp.arrayBuffer();
+    const audioBuf = await walkieAudioCtx.decodeAudioData(arrayBuf);
+    const source = walkieAudioCtx.createBufferSource();
+    source.buffer = audioBuf;
+    source.connect(walkieAudioCtx.destination);
+    source.onended = () => { autoPlayAudioBusy = false; processAutoPlayQueue(); };
+    source.start(0);
+    console.log('[自动播放] 开始播放语音消息(AudioContext)');
+  } catch(err) {
+    console.warn('[自动播放] AudioContext失败，降级HTML5 Audio:', err.message);
+    // 降级：HTML5 Audio
+    try {
+      const audio = new Audio(url);
+      audio.play().then(() => {
+        console.log('[自动播放] 开始播放语音消息(HTML5)');
+      }).catch(e => console.warn('[自动播放] HTML5也失败:', e.message));
+      audio.onended = () => { autoPlayAudioBusy = false; processAutoPlayQueue(); };
+      audio.onerror = () => { autoPlayAudioBusy = false; processAutoPlayQueue(); };
+    } catch(e2) {
+      console.error('[自动播放] 全部失败:', e2);
+      autoPlayAudioBusy = false;
+      processAutoPlayQueue();
+    }
+  }
 }
 function stopAutoPlayAudio() {
   autoPlayAudioQueue = [];
