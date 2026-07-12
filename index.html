@@ -744,10 +744,10 @@ function renderNews(containerId, dateId, userMessages, isAutoRefresh) {
   }
 
   container.innerHTML = html;
-  // 同步更新五子棋页面的新闻摘要
-  if (containerId === 'member-news-grid' && userMessages && userMessages.length > 0) {
-    gkRenderNews(userMessages);
-  }
+  // 同步更新五子棋页面的新闻摘要（五子棋tab已移除，跳过）
+  // if (containerId === 'member-news-grid' && userMessages && userMessages.length > 0) {
+  //   gkRenderNews(userMessages);
+  // }
 }
 
 function escapeHtml(str) {
@@ -1242,10 +1242,11 @@ function subscribeMessageChanges() {
     try {
       const messages = await fetchMessages();
       renderNews('member-news-grid', 'member-news-date', messages, true);
-      const gkGrid = document.getElementById('gk-news-grid');
-      if (gkGrid && gkGrid.style.display !== 'none') {
-        gkRenderNews(messages);
-      }
+      // 五子棋tab已移除，不再同步
+      // const gkGrid = document.getElementById('gk-news-grid');
+      // if (gkGrid && gkGrid.style.display !== 'none') {
+      //   gkRenderNews(messages);
+      // }
     } catch (err) {
       console.error('[实时消息] 刷新失败:', err);
     }
@@ -1709,6 +1710,7 @@ function gkShow(view) {
 // 渲染右边tab：只取最后1条评论卡片（逻辑与行业简报的评论卡片完全一致）
 function gkRenderNews(messages) {
   const container = document.getElementById('gk-news-grid');
+  if (!container) return;
 
   let html = '';
   if (messages && messages.length > 0) {
