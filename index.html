@@ -273,6 +273,15 @@ html.light .walkie-sub-toggle.on .toggle-knob { background: var(--accent-light);
   border-color: #ff6b8a; color: #ff6b8a;
   background: rgba(255,107,138,0.12);
 }
+/* 对讲机在线人数徽章 */
+.walkie-count-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 20px; height: 20px; border-radius: 10px;
+  background: var(--accent); color: #fff; font-size: 11px; font-weight: 600;
+  padding: 0 6px; margin-right: 6px; margin-top: 8px; vertical-align: middle;
+  line-height: 1; transition: opacity 0.2s;
+}
+.walkie-count-badge.hidden { display: none; }
 /* 游客ID时间标记 */
 .news-category-line { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .guest-id { font-size: 11px; color: var(--text-muted); letter-spacing: 0.5px; transition: color 0.3s; }
@@ -736,8 +745,10 @@ function renderNews(containerId, dateId, userMessages, isAutoRefresh) {
     if (newestMsg.image_url) msgHtml += `<span class="img-toggle" onclick="toggleImg(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg> 查看图片</span><div class="img-fold"><img src="${newestMsg.image_url}" alt="配图" onclick="showOverlay(this.src)"></div>`;
     if (newestMsg.video_url) msgHtml += `<span class="img-toggle" onclick="toggleVideo(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M22 8l-6 4 6 4V8z"/></svg> 查看视频</span><div class="img-fold"><video controls preload="metadata" playsinline style="max-width:100%;border-radius:6px;"><source src="${newestMsg.video_url}" type="video/mp4">您的浏览器不支持视频播放</video></div>`;
     if (newestMsg.audio_url) msgHtml += `<audio controls src="${newestMsg.audio_url}" preload="metadata">您的浏览器不支持语音播放</audio>`;
-    // 爱心复制按钮
+    // 爱心复制按钮（左侧加对讲机在线人数徽章）
     const copyText = newestMsg.text || '';
+    const walkieSubCount = Object.keys(onlineSubscribers).length;
+    msgHtml += `<span class="walkie-count-badge${walkieSubCount > 0 ? '' : ' hidden'}" title="对讲机在线人数">${walkieSubCount}</span>`;
     msgHtml += `<span class="copy-heart" onclick="copyComment(this, '${escapeHtml(copyText).replace(/'/g, "\\'")}')" title="复制评论">${getCopyIcon()}</span>`;
     msgHtml += `</div>`;
     html += msgHtml;
@@ -1821,6 +1832,12 @@ function updateOnlineCountDisplay() {
   document.querySelectorAll('.online-count').forEach(el => {
     el.textContent = onlineCount > 0 ? onlineCount : '';
   });
+  // 同步更新对讲机在线人数徽章
+  const walkieSubCount = Object.keys(onlineSubscribers).length;
+  document.querySelectorAll('.walkie-count-badge').forEach(el => {
+    el.textContent = walkieSubCount;
+    el.classList.toggle('hidden', walkieSubCount === 0);
+  });
 }
 
 // ===== 五子棋 =====
@@ -1865,6 +1882,8 @@ function gkRenderNews(messages) {
     if (newestMsg.video_url) msgHtml += `<span class="img-toggle" onclick="toggleVideo(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M22 8l-6 4 6 4V8z"/></svg> 查看视频</span><div class="img-fold"><video controls preload="metadata" playsinline style="max-width:100%;border-radius:6px;"><source src="${newestMsg.video_url}" type="video/mp4">您的浏览器不支持视频播放</video></div>`;
     if (newestMsg.audio_url) msgHtml += `<audio controls src="${newestMsg.audio_url}" preload="metadata">您的浏览器不支持语音播放</audio>`;
     const copyText = newestMsg.text || '';
+    const walkieSubCountGk = Object.keys(onlineSubscribers).length;
+    msgHtml += `<span class="walkie-count-badge${walkieSubCountGk > 0 ? '' : ' hidden'}" title="对讲机在线人数">${walkieSubCountGk}</span>`;
     msgHtml += `<span class="copy-heart" onclick="copyComment(this, '${escapeHtml(copyText).replace(/'/g, "\\'")}')" title="复制评论">${getCopyIcon()}</span>`;
     msgHtml += `</div>`;
     html += msgHtml;
