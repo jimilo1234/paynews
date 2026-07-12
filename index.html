@@ -227,7 +227,7 @@ html.light .walkie-sub-toggle.on .toggle-knob { background: var(--accent-light);
 
 .news-grid { max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; padding-top: 16px; }
 @media (min-width: 768px) {
-  .news-grid { max-width: 900px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .news-grid { max-width: 1200px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 }
 .news-item {
   background: var(--bg-card); border: 1px solid var(--border-card);
@@ -368,7 +368,7 @@ html.light .guest-id.broadcasting { color: #222; }
 .comment-fab.open:hover { background: #c0392b; }
 .comment-panel {
   position: fixed; right: 16px; bottom: 76px; z-index: 199;
-  width: 320px; max-height: 70vh;
+  width: 340px; max-height: 70vh;
   background: var(--bg-bar); backdrop-filter: blur(16px);
   border: 1px solid var(--border-card); border-radius: 16px;
   padding: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.3);
@@ -376,12 +376,12 @@ html.light .guest-id.broadcasting { color: #222; }
   transition: opacity 0.2s, transform 0.2s;
 }
 .comment-panel.open { display: flex; }
-.comment-panel-title { font-size: 14px; font-weight: 600; color: var(--text-bright); }
+/* comment-panel-title removed */
 .message-input-area {
   position: static; background: none; backdrop-filter: none;
   border-top: none; padding: 0; z-index: auto;
 }
-.input-row { display: flex; gap: 6px; align-items: stretch; max-width: none; margin: 0; }
+.input-row { display: flex; gap: 8px; align-items: stretch; max-width: none; margin: 0; }
 .input-col { display: flex; flex-direction: column; gap: 4px; flex: 1; }
 .input-col textarea {
   flex: 1; padding: 5px 10px; border-radius: 10px;
@@ -400,24 +400,18 @@ html.light .guest-id.broadcasting { color: #222; }
 .input-col .send-btn:hover { background: #7c6cf7; }
 .input-col .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .input-side-btns {
-  display: flex; flex-direction: row; gap: 4px; align-items: center;
-  padding: 4px 0; flex-wrap: wrap;
+  display: flex; flex-direction: column; gap: 4px; align-items: center;
+  padding: 2px 0; flex-shrink: 0;
 }
 .input-side-btns .img-upload-btn,
-.input-side-btns .voice-btn,
-.input-side-btns .refresh-btn {
+.input-side-btns .voice-btn {
   font-size: 0; cursor: pointer; transition: transform 0.15s; user-select: none;
   padding: 6px 7px; border-radius: 8px; border: 1px solid var(--border-card);
   background: var(--bg-card); color: var(--text); line-height: 1;
   display: flex; align-items: center; justify-content: center;
 }
 .input-side-btns .img-upload-btn:hover,
-.input-side-btns .voice-btn:hover,
-.input-side-btns .refresh-btn:hover { background: var(--bg-card-hover); transform: scale(1.05); }
-.input-side-btns .refresh-btn {
-  font-size: 14px; border: 1px solid rgba(108,92,231,0.4);
-  background: rgba(108,92,231,0.15); color: var(--accent-light);
-}
+.input-side-btns .voice-btn:hover { background: var(--bg-card-hover); transform: scale(1.05); }
 /* 手机端适配 */
 @media (max-width: 767px) {
   .comment-panel { right: 8px; left: 8px; width: auto; bottom: 68px; }
@@ -568,27 +562,24 @@ html.light .guest-id.broadcasting { color: #222; }
     </button>
     <!-- 悬浮评论面板 -->
     <div class="comment-panel" id="comment-panel">
-      <div class="comment-panel-title">💬 发表评论</div>
       <div class="message-input-area">
         <div class="input-row">
           <div class="input-col">
             <textarea id="msg-text" placeholder="写点什么..." maxlength="200" rows="2"></textarea>
             <button class="send-btn" id="send-btn">发布新闻</button>
           </div>
-        </div>
-        <div class="input-side-btns" style="margin-top:6px;">
-          <label class="img-upload-btn" title="上传图片">
-            <span id="ico-img"></span>
-            <input type="file" id="msg-image" accept="image/*" hidden>
-          </label>
-          <label class="img-upload-btn" title="上传视频（Live动态）">
-            <span id="ico-video"></span>
-            <input type="file" id="msg-video" accept="video/*" hidden>
-          </label>
-          <span class="voice-btn" id="voice-btn" title="录制语音"><span id="ico-mic"></span></span>
-          <button class="refresh-btn" id="refresh-btn"><span id="ico-refresh"></span></button>
-          <span class="walkie-btn" id="walkie-btn" title="对讲机（按住说话）"
-            ><span id="ico-walkie"></span></span>
+          <div class="input-side-btns">
+            <label class="img-upload-btn" title="上传图片">
+              <span id="ico-img"></span>
+              <input type="file" id="msg-image" accept="image/*" hidden>
+            </label>
+            <label class="img-upload-btn" title="上传视频（Live动态）">
+              <span id="ico-video"></span>
+              <input type="file" id="msg-video" accept="video/*" hidden>
+            </label>
+            <span class="voice-btn" id="voice-btn" title="录制语音"><span id="ico-mic"></span></span>
+            <span class="walkie-btn" id="walkie-btn" title="对讲机（按住说话）"><span id="ico-walkie"></span></span>
+          </div>
         </div>
 
       <div class="recording-bar" id="recording-bar">
@@ -1216,26 +1207,7 @@ async function loadPublicMessages() {
   renderNews('public-news-grid', 'public-news-date', []);
 }
 
-// 刷新留言（不退出登录）
-async function doRefresh() {
-  if (!currentUser) return;
-  const refreshBtn = document.getElementById('refresh-btn');
-  refreshBtn.disabled = true;
-  refreshBtn.innerHTML = ICO.refresh;
-  try {
-    const messages = await fetchMessages();
-    hasNewMessages = false;  // 手动刷新恢复颜色
-    renderNews('member-news-grid', 'member-news-date', messages, false);
-    // 手动刷新时恢复颜色和标签
-    document.getElementById('member-news-date').classList.remove('has-update');
-    document.title = '支付行业新闻';
-  } catch (err) {
-    console.error('刷新失败:', err);
-  } finally {
-    refreshBtn.disabled = false;
-    refreshBtn.innerHTML = ICO.refresh;
-  }
-}
+// doRefresh removed - auto-refresh via Supabase broadcast
 
 // ===== 对讲机（Push-to-Talk via Supabase Broadcast） =====
 let walkieChannel = null;
@@ -1561,7 +1533,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.key === 'Enter') doLogin();
   });
   document.getElementById('logout-btn').addEventListener('click', doLogout);
-  document.getElementById('refresh-btn').addEventListener('click', doRefresh);
+  // refresh-btn removed
   document.getElementById('send-btn').addEventListener('click', doSendMessage);
   document.getElementById('msg-text').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSendMessage(); }
