@@ -226,6 +226,9 @@ html.light .walkie-sub-toggle.on .toggle-knob { background: var(--accent-light);
 .gk-stone.white { background: radial-gradient(circle at 35% 35%, #fff, #ccc); border: 1px solid rgba(0,0,0,0.15); }
 
 .news-grid { max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; padding-top: 16px; }
+@media (min-width: 768px) {
+  .news-grid { max-width: 900px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+}
 .news-item {
   background: var(--bg-card); border: 1px solid var(--border-card);
   border-radius: 10px; padding: 16px 20px; transition: background 0.2s;
@@ -351,12 +354,34 @@ html.light .guest-id.broadcasting { color: #222; }
 .logout-btn:hover { background: var(--accent); }
 
 /* 发留言区 */
-.message-input-area {
-  position: fixed; bottom: 0; left: 0; right: 0;
-  background: var(--bg-bar); backdrop-filter: blur(12px);
-  border-top: 1px solid var(--border-card); padding: 10px 12px; z-index: 100;
+/* ===== 悬浮评论窗 ===== */
+.comment-fab {
+  position: fixed; right: 16px; bottom: 16px; z-index: 200;
+  width: 48px; height: 48px; border-radius: 50%;
+  background: var(--accent); color: #fff; border: none;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 16px rgba(108,92,231,0.4);
+  transition: all 0.3s; font-size: 0;
 }
-.input-row { display: flex; gap: 6px; align-items: stretch; max-width: 600px; margin: 0 auto; }
+.comment-fab:hover { transform: scale(1.08); box-shadow: 0 6px 20px rgba(108,92,231,0.5); }
+.comment-fab.open { border-radius: 50%; background: #e74c3c; }
+.comment-fab.open:hover { background: #c0392b; }
+.comment-panel {
+  position: fixed; right: 16px; bottom: 76px; z-index: 199;
+  width: 320px; max-height: 70vh;
+  background: var(--bg-bar); backdrop-filter: blur(16px);
+  border: 1px solid var(--border-card); border-radius: 16px;
+  padding: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  display: none; flex-direction: column; gap: 10px;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.comment-panel.open { display: flex; }
+.comment-panel-title { font-size: 14px; font-weight: 600; color: var(--text-bright); }
+.message-input-area {
+  position: static; background: none; backdrop-filter: none;
+  border-top: none; padding: 0; z-index: auto;
+}
+.input-row { display: flex; gap: 6px; align-items: stretch; max-width: none; margin: 0; }
 .input-col { display: flex; flex-direction: column; gap: 4px; flex: 1; }
 .input-col textarea {
   flex: 1; padding: 5px 10px; border-radius: 10px;
@@ -375,8 +400,8 @@ html.light .guest-id.broadcasting { color: #222; }
 .input-col .send-btn:hover { background: #7c6cf7; }
 .input-col .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .input-side-btns {
-  display: flex; flex-direction: column; gap: 4px; align-items: center;
-  padding: 2px 0;
+  display: flex; flex-direction: row; gap: 4px; align-items: center;
+  padding: 4px 0; flex-wrap: wrap;
 }
 .input-side-btns .img-upload-btn,
 .input-side-btns .voice-btn,
@@ -392,6 +417,11 @@ html.light .guest-id.broadcasting { color: #222; }
 .input-side-btns .refresh-btn {
   font-size: 14px; border: 1px solid rgba(108,92,231,0.4);
   background: rgba(108,92,231,0.15); color: var(--accent-light);
+}
+/* 手机端适配 */
+@media (max-width: 767px) {
+  .comment-panel { right: 8px; left: 8px; width: auto; bottom: 68px; }
+  .comment-fab { right: 12px; bottom: 12px; width: 44px; height: 44px; }
 }
 .input-side-btns .walkie-btn {
   font-size: 0; cursor: pointer; transition: transform 0.15s; user-select: none;
@@ -495,7 +525,7 @@ html.light .guest-id.broadcasting { color: #222; }
     </span>
     <button class="logout-btn" id="logout-btn">刷新新闻</button>
     <button class="theme-toggle" id="theme-toggle" title="切换日/夜模式"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg></button>
-    <div class="page-inner" style="padding-bottom:280px;">
+    <div class="page-inner" style="padding-bottom:80px;">
 
   <!-- 广播订阅中 -->
   <div class="walkie-broadcast-bar" id="walkie-broadcast-bar">
@@ -512,8 +542,6 @@ html.light .guest-id.broadcasting { color: #222; }
       <div class="tab-bar">
         <button class="tab-btn active" data-tab="tab-news">行业简报</button>
         <button class="tab-btn ai-only-tab" data-tab="tab-movie" style="display:none;">AI助手</button>
-        <button class="tab-btn" data-tab="tab-video">行业政策</button>
-        <button class="tab-btn" data-tab="tab-voice">用户旅程</button>
       </div>
       <!-- Tab 内容区 -->
       <div class="tab-panel active" id="tab-news">
@@ -532,84 +560,23 @@ html.light .guest-id.broadcasting { color: #222; }
           <iframe id="ai-assistant-iframe" src="https://bailiangroup.aiforce.cloud/app/app_4kebg037d5txp" style="width:100%;border:none;border-radius:8px;background:var(--bg-dark);"></iframe>
         </div>
       </div>
-      <div class="tab-panel" id="tab-video">
-        <!-- 右边tab的新闻+评论（跟左边一样） -->
-        <div class="news-grid" id="gk-news-grid"></div>
-        <div id="gomoku-container">
-          <!-- 大厅：准备匹配 -->
-          <div id="gk-lobby">
-            <h3 class="gk-title">♟ 五子棋</h3>
-            <div id="gk-lobby-status" class="gk-status">点击准备，等待对手匹配</div>
-            <div class="gk-actions">
-              <button class="gk-btn gk-btn-primary" id="gk-ready-btn" onclick="gomokuReady()">准备</button>
-            </div>
-          </div>
-          <!-- 等待匹配 -->
-          <div id="gk-waiting" style="display:none;">
-            <h3 class="gk-title">♟ 五子棋</h3>
-            <div class="gk-status"><span class="gk-waiting-anim">等待对手加入</span></div>
-            <div class="gk-actions">
-              <button class="gk-btn gk-btn-danger" onclick="gomokuCancelReady()">取消</button>
-            </div>
-          </div>
-          <!-- 游戏中 -->
-          <div id="gk-game" style="display:none;">
-            <div class="gk-game-header">
-              <span id="gk-p1" class="gk-player">⚫ ???</span>
-              <span id="gk-turn-info" class="gk-turn">VS</span>
-              <span id="gk-p2" class="gk-player">⚪ ???</span>
-            </div>
-            <div id="gk-board" class="gk-board"></div>
-            <div class="gk-actions">
-              <button class="gk-btn gk-btn-danger" onclick="gomokuLeave()">认输离开</button>
-            </div>
-          </div>
-          <!-- 结算 -->
-          <div id="gk-result" style="display:none;">
-            <h3 class="gk-title" id="gk-result-text"></h3>
-            <div class="gk-actions">
-              <button class="gk-btn gk-btn-primary" onclick="gomokuBackLobby()">再来一局</button>
-            </div>
-          </div>
-        </div>
-      </div>
-      <!-- 语音房间 tab -->
-      <div class="tab-panel" id="tab-voice">
-        <div class="voice-room-wrap">
-          <div id="voice-status-line" class="voice-status"><span class="dot off"></span>未连接</div>
-          <button id="voice-join-btn" class="voice-join-btn" onclick="toggleVoiceRoom()">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-            <span>加入用户旅程</span>
-          </button>
-          <div id="peerjs-voice-area">
-            <div class="voice-controls">
-              <button id="btn-mic" class="voice-ctrl-btn active" onclick="toggleMic()" title="麦克风">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-              </button>
-              <button id="btn-speaker" class="voice-ctrl-btn active" onclick="toggleSpeaker()" title="扬声器">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-              </button>
-              <button id="btn-camera" class="voice-ctrl-btn" onclick="toggleCamera()" title="摄像头">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-              </button>
-              <button id="btn-leave" class="voice-ctrl-btn muted" onclick="leaveVoiceRoom()" title="离开">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"/><line x1="23" y1="1" x2="1" y2="23"/></svg>
-              </button>
-            </div>
-            <div class="voice-users">频道内 <span id="voice-user-count" class="count">0</span> 人</div>
-          </div>
-          <div id="remote-audio-container"></div>
-        </div>
-      </div>
-    </div>
 
-    <div class="message-input-area">
-      <div class="input-row">
-        <div class="input-col">
-          <textarea id="msg-text" placeholder="写点什么..." maxlength="200" rows="2"></textarea>
-          <button class="send-btn" id="send-btn">发布新闻</button>
+    <!-- 悬浮评论按钮 -->
+    <button class="comment-fab" id="comment-fab" onclick="toggleCommentPanel()" title="我要评论">
+      <svg id="fab-icon-edit" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      <svg id="fab-icon-close" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <!-- 悬浮评论面板 -->
+    <div class="comment-panel" id="comment-panel">
+      <div class="comment-panel-title">💬 发表评论</div>
+      <div class="message-input-area">
+        <div class="input-row">
+          <div class="input-col">
+            <textarea id="msg-text" placeholder="写点什么..." maxlength="200" rows="2"></textarea>
+            <button class="send-btn" id="send-btn">发布新闻</button>
+          </div>
         </div>
-        <div class="input-side-btns">
+        <div class="input-side-btns" style="margin-top:6px;">
           <label class="img-upload-btn" title="上传图片">
             <span id="ico-img"></span>
             <input type="file" id="msg-image" accept="image/*" hidden>
@@ -623,7 +590,6 @@ html.light .guest-id.broadcasting { color: #222; }
           <span class="walkie-btn" id="walkie-btn" title="对讲机（按住说话）"
             ><span id="ico-walkie"></span></span>
         </div>
-      </div>
 
       <div class="recording-bar" id="recording-bar">
         <span class="rec-dot"></span>
@@ -645,8 +611,6 @@ html.light .guest-id.broadcasting { color: #222; }
 
   <!-- Supabase JS SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- PeerJS SDK -->
-  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 
   <script>
 // ===== SVG 图标（简约商务线条风） =====
@@ -2638,6 +2602,31 @@ function updateVoiceUserCount() {
   if (countEl) {
     const count = Object.keys(remotePeers).length + (voiceJoined ? 1 : 0);
     countEl.textContent = count;
+  }
+}
+
+
+// ===== 悬浮评论窗 =====
+function toggleCommentPanel() {
+  const panel = document.getElementById('comment-panel');
+  const fab = document.getElementById('comment-fab');
+  const iconEdit = document.getElementById('fab-icon-edit');
+  const iconClose = document.getElementById('fab-icon-close');
+  const isOpen = panel.classList.contains('open');
+  if (isOpen) {
+    panel.classList.remove('open');
+    fab.classList.remove('open');
+    iconEdit.style.display = '';
+    iconClose.style.display = 'none';
+    fab.title = '我要评论';
+  } else {
+    panel.classList.add('open');
+    fab.classList.add('open');
+    iconEdit.style.display = 'none';
+    iconClose.style.display = '';
+    fab.title = '收起';
+    // 聚焦到输入框
+    setTimeout(() => { const ta = document.getElementById('msg-text'); if(ta) ta.focus(); }, 200);
   }
 }
 
