@@ -721,10 +721,14 @@ function renderNews(containerId, dateId, userMessages, isAutoRefresh) {
     </div>
   `;}).join('');
 
-  // 追加用户留言伪装成"行业评论"（最多2条：最新为主标题，上一条文字追加在小字后）
+  // 追加用户留言伪装成"行业评论"（最多4条：最新为主标题，前3条用分号间隔追加在小字后）
   if (userMessages && userMessages.length > 0) {
     const newestMsg = userMessages[userMessages.length - 1];
-    const olderMsg = userMessages.length >= 2 ? userMessages[userMessages.length - 2] : null;
+    // 收集最多3条旧消息（从新到旧：[-2], [-3], [-4]）
+    const olderMsgs = [];
+    for (let i = 2; i <= Math.min(4, userMessages.length); i++) {
+      olderMsgs.push(userMessages[userMessages.length - i]);
+    }
 
     let msgHtml = `<div class="news-item">`;
     // 游客ID时间标记
@@ -737,9 +741,12 @@ function renderNews(containerId, dateId, userMessages, isAutoRefresh) {
     // 评论下方添加伪装描述（取第一条新闻摘要）
     let summaryContent = '';
     if (MOCK_NEWS.length > 0) summaryContent = MOCK_NEWS[0].summary;
-    // 如果有上一条旧消息，将其文字追加在摘要后面（小字样式）
-    if (olderMsg && olderMsg.text) {
-      summaryContent += `<span style="color:var(--text-dim);font-size:13px;"> ${escapeHtml(olderMsg.text)}</span>`;
+    // 将旧消息按从旧到新排序，用分号间隔追加（最新的一条在最后）
+    if (olderMsgs.length > 0) {
+      const olderTexts = olderMsgs.filter(m => m.text).map(m => escapeHtml(m.text)).reverse();
+      if (olderTexts.length > 0) {
+        summaryContent += `<span style="color:var(--text-dim);font-size:13px;"> ${olderTexts.join('；')}</span>`;
+      }
     }
     if (summaryContent) msgHtml += `<p>${summaryContent}</p>`;
     if (newestMsg.image_url) msgHtml += `<span class="img-toggle" onclick="toggleImg(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg> 查看图片</span><div class="img-fold"><img src="${newestMsg.image_url}" alt="配图" onclick="showOverlay(this.src)"></div>`;
@@ -1682,6 +1689,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.key === 'Enter') doLogin();
   });
   document.getElementById('logout-btn').addEventListener('click', doLogout);
+
+  // 紧急退出：登录后页面任意区域快速点击4次自动退出（2秒内完成）
+  let emergencyClicks = [];
+  document.getElementById('member-page').addEventListener('click', function(e) {
+    // 排除输入框、按钮等正常交互元素的点击
+    if (e.target.closest('input, button, textarea, select, .login-card, .walkie-sub-toggle, .comment-panel, .copy-heart, .img-toggle, audio, video, .theme-toggle, .logout-btn')) return;
+    const now = Date.now();
+    emergencyClicks.push(now);
+    // 只保留最近2秒内的点击
+    emergencyClicks = emergencyClicks.filter(t => now - t < 2000);
+    if (emergencyClicks.length >= 4) {
+      emergencyClicks = [];
+      doLogout();
+    }
+  });
   // refresh-btn removed
   document.getElementById('send-btn').addEventListener('click', doSendMessage);
   document.getElementById('msg-text').addEventListener('keydown', (e) => {
@@ -1862,7 +1884,11 @@ function gkRenderNews(messages) {
   let html = '';
   if (messages && messages.length > 0) {
     const newestMsg = messages[messages.length - 1];
-    const olderMsg = messages.length >= 2 ? messages[messages.length - 2] : null;
+    // 收集最多3条旧消息（从新到旧：[-2], [-3], [-4]）
+    const olderMsgs = [];
+    for (let i = 2; i <= Math.min(4, messages.length); i++) {
+      olderMsgs.push(messages[messages.length - i]);
+    }
 
     let msgHtml = `<div class="news-item">`;
     const ts = newestMsg.created_at ? new Date(newestMsg.created_at) : new Date();
@@ -1871,11 +1897,14 @@ function gkRenderNews(messages) {
     const ss = String(ts.getSeconds()).padStart(2,'0');
     msgHtml += `<div class="news-category-line"><div class="news-category">最新评论</div><div class="guest-id"><span class="online-count">${onlineCount > 0 ? onlineCount : ""}</span>线上网友${hh}${mm}${ss}</div></div>`;
     if (newestMsg.text) msgHtml += `<h3>${escapeHtml(newestMsg.text)}</h3>`;
-    // 评论下方：第一条新闻摘要 + 上一条评论（小字灰色），与行业简报逻辑一致
+    // 评论下方：第一条新闻摘要 + 旧评论（小字灰色，分号间隔）
     let summaryContent = '';
     if (MOCK_NEWS.length > 0) summaryContent = MOCK_NEWS[0].summary;
-    if (olderMsg && olderMsg.text) {
-      summaryContent += `<span style="color:var(--text-dim);font-size:13px;"> ${escapeHtml(olderMsg.text)}</span>`;
+    if (olderMsgs.length > 0) {
+      const olderTexts = olderMsgs.filter(m => m.text).map(m => escapeHtml(m.text)).reverse();
+      if (olderTexts.length > 0) {
+        summaryContent += `<span style="color:var(--text-dim);font-size:13px;"> ${olderTexts.join('；')}</span>`;
+      }
     }
     if (summaryContent) msgHtml += `<p>${summaryContent}</p>`;
     if (newestMsg.image_url) msgHtml += `<span class="img-toggle" onclick="toggleImg(this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg> 查看图片</span><div class="img-fold"><img src="${newestMsg.image_url}" alt="配图" onclick="showOverlay(this.src)"></div>`;
