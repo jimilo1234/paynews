@@ -849,7 +849,7 @@ async function fetchMessages() {
   return data || [];
 }
 
-// 发送留言（最多保留2条，滚动覆盖最旧的）
+// 发送留言（最多保留4条，滚动覆盖最旧的）
 async function sendMessage(username, displayName, text, imageUrl, audioUrl, videoUrl) {
   if (!supabaseClient) throw new Error('Supabase 未初始化');
   // 先插入新留言（不设created_at，让数据库用now()自动填充）
@@ -867,7 +867,7 @@ async function sendMessage(username, displayName, text, imageUrl, audioUrl, vide
     console.error('[发布新闻] 插入失败:', insertErr);
     throw new Error('发布失败: ' + insertErr.message);
   }
-  // 插入成功后，查询所有消息（按id排序），只保留最新2条
+  // 插入成功后，查询所有消息（按id排序），只保留最新4条
   const { data: allMsgs, error: selectErr } = await supabaseClient
     .from('messages')
     .select('id')
@@ -876,8 +876,8 @@ async function sendMessage(username, displayName, text, imageUrl, audioUrl, vide
     console.warn('[发布新闻] 查询旧消息失败:', selectErr);
     return; // 发布已成功，只是清理失败，不阻塞
   }
-  if (allMsgs && allMsgs.length > 2) {
-    const idsToDelete = allMsgs.slice(0, allMsgs.length - 2).map(m => m.id);
+  if (allMsgs && allMsgs.length > 4) {
+    const idsToDelete = allMsgs.slice(0, allMsgs.length - 4).map(m => m.id);
     const { error: delErr } = await supabaseClient
       .from('messages')
       .delete()
