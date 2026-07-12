@@ -841,19 +841,26 @@ async function sendMessage(username, displayName, text, imageUrl, audioUrl, vide
       audio_url: audioUrl || null,
       video_url: videoUrl || null
     });
-  if (insertErr) throw insertErr;
+  if (insertErr) {
+    console.error('[发布新闻] 插入失败:', insertErr);
+    throw new Error('发布失败: ' + insertErr.message);
+  }
   // 插入成功后，查询所有消息（按id排序），只保留最新2条
-  const { data: allMsgs } = await supabaseClient
+  const { data: allMsgs, error: selectErr } = await supabaseClient
     .from('messages')
     .select('id')
     .order('id', { ascending: true });
+  if (selectErr) {
+    console.warn('[发布新闻] 查询旧消息失败:', selectErr);
+    return; // 发布已成功，只是清理失败，不阻塞
+  }
   if (allMsgs && allMsgs.length > 2) {
     const idsToDelete = allMsgs.slice(0, allMsgs.length - 2).map(m => m.id);
     const { error: delErr } = await supabaseClient
       .from('messages')
       .delete()
       .in('id', idsToDelete);
-    if (delErr) console.warn('删除旧留言失败:', delErr);
+    if (delErr) console.warn('[发布新闻] 清理旧消息失败（不影响发布）:', delErr);
   }
 }
 
@@ -863,19 +870,14 @@ async function uploadImage(file, username) {
   const ext = file.name.split('.').pop().toLowerCase();
   const fixedPath = `shared_image.${ext}`;
 
-  // 删除所有旧图片格式
-  const possibleExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-  for (const oldExt of possibleExts) {
-    try {
-      await supabaseClient.storage.from('images').remove([`shared_image.${oldExt}`]);
-    } catch (e) { /* 旧文件不存在则忽略 */ }
-  }
-
-  // 上传新图
+  // 上传新图（upsert: true 直接覆盖，避免先删后传的竞态）
   const { data, error } = await supabaseClient.storage
     .from('images')
-    .upload(fixedPath, file, { contentType: file.type });
-  if (error) throw error;
+    .upload(fixedPath, file, { contentType: file.type, upsert: true });
+  if (error) {
+    console.error('[上传图片] 失败:', error);
+    throw new Error('图片上传失败: ' + error.message);
+  }
   const { data: urlData } = supabaseClient.storage
     .from('images')
     .getPublicUrl(fixedPath);
@@ -888,19 +890,14 @@ async function uploadVideo(file, username) {
   const ext = file.name.split('.').pop().toLowerCase();
   const fixedPath = `shared_video.${ext || 'mp4'}`;
 
-  // 删除所有旧视频格式
-  const possibleExts = ['mp4', 'mov', 'webm', 'm4v', '3gp', 'mkv'];
-  for (const oldExt of possibleExts) {
-    try {
-      await supabaseClient.storage.from('images').remove([`shared_video.${oldExt}`]);
-    } catch (e) { /* 旧文件不存在则忽略 */ }
-  }
-
-  // 上传新视频
+  // 上传新视频（upsert: true 直接覆盖）
   const { data, error } = await supabaseClient.storage
     .from('images')
-    .upload(fixedPath, file, { contentType: file.type || 'video/mp4', upsert: false });
-  if (error) throw error;
+    .upload(fixedPath, file, { contentType: file.type || 'video/mp4', upsert: true });
+  if (error) {
+    console.error('[上传视频] 失败:', error);
+    throw new Error('视频上传失败: ' + error.message);
+  }
   const { data: urlData } = supabaseClient.storage
     .from('images')
     .getPublicUrl(fixedPath);
@@ -913,17 +910,14 @@ async function uploadAudio(blob, username) {
   const ext = blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm';
   const fixedPath = `shared_voice.${ext}`;
 
-  // 删除所有旧语音格式
-  const possibleExts = ['webm', 'ogg', 'm4a'];
-  for (const oldExt of possibleExts) {
-    try { await supabaseClient.storage.from('images').remove([`shared_voice.${oldExt}`]); } catch(e) {}
-  }
-
-  // 上传
+  // 上传（upsert: true 直接覆盖）
   const { data, error } = await supabaseClient.storage
     .from('images')
-    .upload(fixedPath, blob, { contentType: blob.type || 'audio/webm' });
-  if (error) throw error;
+    .upload(fixedPath, blob, { contentType: blob.type || 'audio/webm', upsert: true });
+  if (error) {
+    console.error('[上传语音] 失败:', error);
+    throw new Error('语音上传失败: ' + error.message);
+  }
 
   const { data: urlData } = supabaseClient.storage
     .from('images')
@@ -1135,8 +1129,17 @@ async function doSendMessage() {
     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
 
   } catch (err) {
-    console.error('发布失败:', err);
-    alert('发布失败: ' + (err.message || '请重试'));
+    console.error('[发布新闻] 失败:', err);
+    // 给用户友好的错误提示
+    let msg = '发布失败';
+    if (err.message) {
+      if (err.message.includes('上传')) msg = err.message;
+      else if (err.message.includes('duplicate') || err.message.includes('已存在')) msg = '文件已存在，请换一张';
+      else if (err.message.includes('JWT') || err.message.includes('auth')) msg = '登录已过期，请重新登录';
+      else if (err.message.includes('network') || err.message.includes('fetch')) msg = '网络异常，请检查网络后重试';
+      else msg = err.message;
+    }
+    alert(msg);
   } finally {
     sendBtn.disabled = false;
     sendBtn.textContent = '发布新闻';
