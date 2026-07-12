@@ -1217,7 +1217,7 @@ async function loadPublicMessages() {
 
 // doRefresh removed - auto-refresh via Supabase broadcast
 
-// ===== 对讲机（Push-to-Talk via Supabase Broadcast） =====
+// ===== 对讲机（Push-to-Talk via Supabase Broadcast · 分段优化版） =====
 let walkieChannel = null;
 let presenceChannel = null;  // 独立的Presence频道追踪在线订阅状态
 let onlineCount = 0;  // 当前在线人数
@@ -1229,6 +1229,15 @@ let currentWalkieAudio = null;  // 追踪当前播放的对讲机音频，避免
 let pttTimer = null;  // PTT录音最长时长计时器
 let walkieChannelReady = false;  // 对讲机频道是否已订阅就绪
 let walkieAudioCtx = null;  // AudioContext，在用户手势时解锁以绕过autoplay限制
+// === 方案A: 分段发送 + 队列 + 顺序播放 ===
+let walkieSendQueue = [];     // 发送队列
+let walkieIsSending = false;  // 发送锁
+let walkieSegId = '';         // 当前PTT会话的段ID
+let walkieSegIndex = 0;       // 当前段序号
+let walkiePlayBuffer = {};    // 播放缓冲 { segId: [seg0, seg1, ...] }
+let walkieIsPlaying = false;  // 播放锁
+let walkiePlaySegId = '';     // 当前播放的会话ID
+let walkiePlayIndex = 0;      // 当前播放到第几段
 
 
 // 新消息实时通知：用Broadcast频道通知其他客户端刷新
@@ -1274,12 +1283,17 @@ function initWalkieTalkie() {
   });
   console.log('[对讲机] walkieChannel已创建');
   walkieChannel.on('broadcast', { event: 'voice' }, (msg) => {
-    console.log('[对讲机] 收到广播! walkieSubscribed=' + walkieSubscribed + ' msgKeys=' + Object.keys(msg).join(','));
-    if (!walkieSubscribed) { console.warn('[对讲机] ⚠️ 订阅未开启，忽略'); return; }
-    const data = msg.payload && msg.payload.audio ? msg.payload : (msg.audio ? msg : null);
-    if (!data) { console.error('[对讲机] payload结构异常:', JSON.stringify(msg).substring(0,300)); return; }
-    console.log('[对讲机] payload OK, mime=' + data.mime + ' audioLen=' + (data.audio?.length));
-    playWalkieVoice(data);
+    if (!walkieSubscribed) return;
+    const data = msg.payload && msg.payload.audio ? msg.payload : null;
+    if (!data || !data.audio) return;
+    console.log('[对讲机] 收到段: segId=' + data.segId + ' idx=' + data.segIndex + ' isLast=' + data.isLast + ' b64Len=' + data.audio.length);
+    // 兼容旧版（无segId的单段消息）
+    if (!data.segId) {
+      playWalkieVoice(data);
+      return;
+    }
+    // 新分段逻辑：缓冲并按序播放
+    bufferAndPlaySegment(data);
   });
   walkieChannel.subscribe((status, err) => {
     console.log('[对讲机] 频道状态:', status, err || '');
@@ -1377,58 +1391,161 @@ function updateAllCopyIcons() {
     if (!el.classList.contains('copied')) el.innerHTML = icon;
   });
 }
-async function playWalkieVoice(payload) {
+// 缓冲分段音频并按序播放
+function bufferAndPlaySegment(seg) {
   const bar = document.getElementById('walkie-broadcast-bar');
-  try {
-    // 先停掉上一条
+  // 如果是一个全新的会话（segId不同），清空旧缓冲
+  if (seg.segId !== walkiePlaySegId && seg.segIndex === 0) {
     stopWalkieAudio();
+    walkiePlayBuffer = {};
+    walkieIsPlaying = false;
+    walkiePlayIndex = 0;
+  }
+  walkiePlaySegId = seg.segId;
+  if (!walkiePlayBuffer[seg.segId]) walkiePlayBuffer[seg.segId] = [];
+  // 按index插入，去重
+  const buf = walkiePlayBuffer[seg.segId];
+  if (!buf[seg.segIndex]) {
+    buf[seg.segIndex] = seg;
+    console.log('[对讲机] 缓冲段: idx=' + seg.segIndex + ' bufLen=' + buf.filter(Boolean).length);
+  }
+  // 如果当前没在播放，从第0段开始
+  if (!walkieIsPlaying) {
+    walkieIsPlaying = true;
+    walkiePlayIndex = 0;
     bar.classList.add('show');
     setGuestIdBroadcasting(true);
+    playCurrentSegment();
+  }
+}
 
-    const rawMime = payload.mime || 'audio/mp4';
-    const mime = rawMime.split(';')[0];
-    console.log('[对讲机]', '播放: mime=' + rawMime + '→' + mime + ' b64Len=' + (payload.audio?.length));
+// 播放缓冲中的当前段，播完自动播下一段
+async function playCurrentSegment() {
+  const bar = document.getElementById('walkie-broadcast-bar');
+  const buf = walkiePlayBuffer[walkiePlaySegId];
+  if (!buf) { finishAllSegments(); return; }
+  const seg = buf[walkiePlayIndex];
+  if (!seg) {
+    // 下一段还没到，等200ms再试
+    if (walkiePlayIndex < 50) { // 防无限等待
+      setTimeout(() => playCurrentSegment(), 200);
+    } else {
+      finishAllSegments();
+    }
+    return;
+  }
+  try {
+    await playSingleSegment(seg);
+    // 播完当前段，播下一段
+    walkiePlayIndex++;
+    playCurrentSegment();
+  } catch(e) {
+    console.error('[对讲机] 段播放失败:', e);
+    finishAllSegments();
+  }
+}
 
-    // base64 → 二进制
-    const binStr = atob(payload.audio);
-    const bytes = new Uint8Array(binStr.length);
-    for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
+function finishAllSegments() {
+  const bar = document.getElementById('walkie-broadcast-bar');
+  walkieIsPlaying = false;
+  walkiePlayIndex = 0;
+  // 清理超过1分钟的旧缓冲
+  const cutoff = Date.now() - 60000;
+  for (const sid in walkiePlayBuffer) {
+    const first = walkiePlayBuffer[sid][0];
+    if (first && first.ts && first.ts < cutoff) delete walkiePlayBuffer[sid];
+  }
+  bar.classList.remove('show');
+  setGuestIdBroadcasting(false);
+  console.log('[对讲机] 全部段播放完');
+}
 
-    // 方案1: AudioContext（绕过autoplay限制，已在用户手势中解锁）
-    if (walkieAudioCtx && walkieAudioCtx.state === 'running') {
-      try {
-        const audioBuffer = await walkieAudioCtx.decodeAudioData(bytes.buffer.slice(0));
+// 播放单个音频段（base64）
+async function playSingleSegment(payload) {
+  const rawMime = payload.mime || 'audio/webm;codecs=opus';
+  const mime = rawMime.split(';')[0];
+  console.log('[对讲机] 播放段: idx=' + payload.segIndex + ' mime=' + mime + ' b64Len=' + payload.audio.length);
+
+  // base64 → 二进制
+  const binStr = atob(payload.audio);
+  const bytes = new Uint8Array(binStr.length);
+  for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
+
+  // 方案1: AudioContext
+  if (walkieAudioCtx && walkieAudioCtx.state === 'running') {
+    try {
+      const audioBuffer = await walkieAudioCtx.decodeAudioData(bytes.buffer.slice(0));
+      return new Promise((resolve, reject) => {
         const source = walkieAudioCtx.createBufferSource();
         source.buffer = audioBuffer;
         source.connect(walkieAudioCtx.destination);
-        source.onended = () => { currentWalkieAudio = null; bar.classList.remove('show'); setGuestIdBroadcasting(false); console.log('[对讲机] AC播放结束'); };
+        source.onended = () => { currentWalkieAudio = null; console.log('[对讲机] 段播放完 idx=' + payload.segIndex); resolve(); };
         currentWalkieAudio = source;
         source.start(0);
-        console.log('[对讲机] ✅ AudioContext播放成功！');
-        return;
-      } catch(acErr) {
-        console.warn('[对讲机]', '⚠️ AC解码失败，fallback: ' + acErr.message);
-      }
+      });
+    } catch(acErr) {
+      console.warn('[对讲机] AC解码失败，fallback: ' + acErr.message);
     }
+  }
 
-    // 方案2: Audio元素 + Blob URL（fallback）
-    const blob = new Blob([bytes], { type: mime });
-    const blobUrl = URL.createObjectURL(blob);
-    const audio = new Audio(blobUrl);
-    audio._blobUrl = blobUrl;
-    currentWalkieAudio = audio;
-    audio.volume = 0.9;
-    audio.onended = () => { URL.revokeObjectURL(blobUrl); currentWalkieAudio = null; bar.classList.remove('show'); setGuestIdBroadcasting(false); console.log('[对讲机] Audio播放结束'); };
-    audio.onerror = (e) => { URL.revokeObjectURL(blobUrl); currentWalkieAudio = null; bar.classList.remove('show'); setGuestIdBroadcasting(false); console.error('[对讲机]', '❌ Audio播放失败: ' + audio.error); };
-    console.log('[对讲机] Audio元素fallback播放...');
-    await audio.play();
-    console.log('[对讲机] ✅ Audio play()成功！');
+  // 方案2: Audio元素 fallback
+  const blob = new Blob([bytes], { type: mime });
+  const blobUrl = URL.createObjectURL(blob);
+  const audio = new Audio(blobUrl);
+  audio._blobUrl = blobUrl;
+  currentWalkieAudio = audio;
+  audio.volume = 0.9;
+  return new Promise((resolve, reject) => {
+    audio.onended = () => { URL.revokeObjectURL(blobUrl); currentWalkieAudio = null; console.log('[对讲机] Audio段播放完 idx=' + payload.segIndex); resolve(); };
+    audio.onerror = (e) => { URL.revokeObjectURL(blobUrl); currentWalkieAudio = null; reject(new Error('Audio播放失败')); };
+    audio.play().catch(reject);
+  });
+}
+
+// 兼容旧版：单段直接播放（无分段）
+async function playWalkieVoice(payload) {
+  const bar = document.getElementById('walkie-broadcast-bar');
+  try {
+    stopWalkieAudio();
+    bar.classList.add('show');
+    setGuestIdBroadcasting(true);
+    await playSingleSegment(payload);
+    bar.classList.remove('show');
+    setGuestIdBroadcasting(false);
   } catch (e) {
     currentWalkieAudio = null;
-    console.error('[对讲机]', '❌ 播放异常: ' + e.message);
+    console.error('[对讲机] 播放异常: ' + e.message);
     bar.classList.remove('show');
     setGuestIdBroadcasting(false);
   }
+}
+
+// === 发送队列 ===
+function enqueueWalkieSegment(base64, mime, segId, segIndex, isLast) {
+  walkieSendQueue.push({ base64, mime, segId, segIndex, isLast });
+  processWalkieQueue();
+}
+
+async function processWalkieQueue() {
+  if (walkieIsSending || walkieSendQueue.length === 0) return;
+  walkieIsSending = true;
+  while (walkieSendQueue.length > 0) {
+    const item = walkieSendQueue.shift();
+    if (!walkieChannel) { walkieIsSending = false; return; }
+    try {
+      const result = walkieChannel.send({
+        type: 'broadcast',
+        event: 'voice',
+        payload: { audio: item.base64, mime: item.mime, from: currentUser?.display_name || '匿名', segId: item.segId, segIndex: item.segIndex, isLast: item.isLast, ts: Date.now() }
+      });
+      console.log('[对讲机] 段已发送 idx=' + item.segIndex + ' isLast=' + item.isLast);
+    } catch(e) {
+      console.error('[对讲机] 段发送失败 idx=' + item.segIndex, e);
+    }
+    // 段间间隔100ms，避免Supabase Broadcast限流
+    if (walkieSendQueue.length > 0) await new Promise(r => setTimeout(r, 100));
+  }
+  walkieIsSending = false;
 }
 
 function stopWalkieAudio() {
@@ -1449,11 +1566,14 @@ function startPTT(e) {
   if (!walkieChannelReady) { console.error('[对讲机] ❌ 频道未就绪，无法录音！'); return; }
   pttActive = true;
   pttChunks = [];
+  // 新会话：生成segId，重置段序号
+  walkieSegId = 'wt_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+  walkieSegIndex = 0;
   const btn = document.getElementById('walkie-btn');
   btn.classList.add('ptt-active');
 
-  // 选择录音格式
-  const mimeOptions = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg'];
+  // 选择录音格式（优先opus压缩格式）
+  const mimeOptions = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
   let selectedMime = '';
   for (const m of mimeOptions) {
     if (MediaRecorder.isTypeSupported(m)) { selectedMime = m; break; }
@@ -1462,36 +1582,46 @@ function startPTT(e) {
 
   navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
     pttRecorder = new MediaRecorder(stream, { mimeType: selectedMime });
-    pttRecorder.ondataavailable = (ev) => { if (ev.data.size > 0) pttChunks.push(ev.data); };
-    pttRecorder.onstop = () => {
-      if (pttTimer) { clearTimeout(pttTimer); pttTimer = null; }
-      stream.getTracks().forEach(t => t.stop());
-      const blob = new Blob(pttChunks, { type: selectedMime });
-      // 转base64并发送
+    // 每2秒产出一个数据块（timeslice=2000ms），实现分段实时发送
+    pttRecorder.ondataavailable = (ev) => {
+      if (ev.data.size === 0) return;
+      const blob = ev.data;
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64 = reader.result.split(',')[1];
-        if (base64 && walkieChannel) {
-          try {
-            console.log('[对讲机]', '发送语音 mime=' + selectedMime + ' b64Len=' + base64.length);
-            const sendResult = walkieChannel.send({
-              type: 'broadcast',
-              event: 'voice',
-              payload: { audio: base64, mime: selectedMime, from: currentUser?.display_name || '匿名' }
-            });
-            console.log('[对讲机]', 'send返回: ' + JSON.stringify(sendResult));
-          } catch (sendErr) {
-            console.error('[对讲机] 发送失败:', sendErr);
-          }
+        if (base64) {
+          console.log('[对讲机] 段就绪: idx=' + walkieSegIndex + ' b64Len=' + base64.length);
+          // 不在这标记isLast，由onstop统一处理最后一段
+          enqueueWalkieSegment(base64, selectedMime, walkieSegId, walkieSegIndex, false);
+          walkieSegIndex++;
         }
       };
       reader.readAsDataURL(blob);
+    };
+    pttRecorder.onstop = () => {
+      if (pttTimer) { clearTimeout(pttTimer); pttTimer = null; }
+      stream.getTracks().forEach(t => t.stop());
       btn.classList.remove('ptt-active');
       pttActive = false;
+      // 把最后一包标记为isLast（通过补发一个空段标记结束）
+      if (walkieSegIndex > 0) {
+        // 最后一段已在ondataavailable中入队，这里只需补一个isLast标记
+        // 由于onstop前最后一次的ondataavailable已经入队了最后一段（isLast=false）
+        // 我们修改队尾的isLast为true
+        // 简化处理：入队时全部isLast=false，在stop时把最后一个改为true
+        for (let i = walkieSendQueue.length - 1; i >= 0; i--) {
+          if (walkieSendQueue[i].segId === walkieSegId) {
+            walkieSendQueue[i].isLast = true;
+            break;
+          }
+        }
+      }
+      console.log('[对讲机] 录音结束, 总段数=' + walkieSegIndex);
     };
-    pttRecorder.start();
-      console.log('[对讲机] 录音开始, mime=' + selectedMime);
-    // 最长录音30秒自动停止，避免base64过大导致广播失败
+    // start(2000) = 每2秒触发一次ondataavailable，实现分段实时发送
+    pttRecorder.start(2000);
+    console.log('[对讲机] 分段录音开始, mime=' + selectedMime + ' timeslice=2000ms');
+    // 最长录音30秒
     pttTimer = setTimeout(() => { if (pttRecorder && pttRecorder.state === 'recording') pttRecorder.stop(); }, 30000);
   }).catch(err => {
     console.error('麦克风获取失败:', err);
