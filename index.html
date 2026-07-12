@@ -228,6 +228,10 @@ html.light .walkie-sub-toggle.on .toggle-knob { background: var(--accent-light);
 .news-grid { max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; padding-top: 16px; }
 @media (min-width: 768px) {
   .news-grid { max-width: 1440px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .login-section { max-width: 1440px; }
+  .login-card { max-width: 600px; }
+  .login-card .input-group { display: inline-block; width: calc(50% - 8px); vertical-align: top; }
+  .login-card .input-group:first-child { margin-right: 16px; }
 }
 .news-item {
   background: var(--bg-card); border: 1px solid var(--border-card);
