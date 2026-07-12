@@ -1267,6 +1267,7 @@ let walkiePlayBuffer = {};    // 播放缓冲 { segId: [seg0, seg1, ...] }
 let walkieIsPlaying = false;  // 播放锁
 let walkiePlaySegId = '';     // 当前播放的会话ID
 let walkiePlayIndex = 0;      // 当前播放到第几段
+let walkiePlayedCache = {};   // 已播放去重缓存 { segKey: timestamp }
 
 
 // 新消息实时通知：用Broadcast频道通知其他客户端刷新
@@ -1315,6 +1316,20 @@ function initWalkieTalkie() {
     if (!walkieSubscribed) return;
     const data = msg.payload && msg.payload.audio ? msg.payload : null;
     if (!data || !data.audio) return;
+    // 去重：同一段音频60秒内不重复播放（防止Supabase重连重投）
+    if (data.segId) {
+      const segKey = data.segId + '_' + data.segIndex;
+      const now = Date.now();
+      if (walkiePlayedCache[segKey] && now - walkiePlayedCache[segKey] < 60000) {
+        console.log('[对讲机] 跳过重复段: ' + segKey);
+        return;
+      }
+      walkiePlayedCache[segKey] = now;
+      // 清理超过2分钟的旧缓存条目
+      for (const k in walkiePlayedCache) {
+        if (now - walkiePlayedCache[k] > 120000) delete walkiePlayedCache[k];
+      }
+    }
     console.log('[对讲机] 收到段: segId=' + data.segId + ' idx=' + data.segIndex + ' isLast=' + data.isLast + ' b64Len=' + data.audio.length);
     // 兼容旧版（无segId的单段消息）
     if (!data.segId) {
