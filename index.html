@@ -1050,6 +1050,10 @@ async function doLogin() {
 
     // 加载留言并进入会员页
     const messages = await fetchMessages();
+    // 初始化lastReadMessageId：登录后只朗读新到达的消息，不朗读历史
+    if (messages.length > 0) {
+      lastReadMessageId = Math.max(...messages.map(m => m.id));
+    }
     document.getElementById('public-page').classList.remove('active');
     document.getElementById('member-page').classList.add('active');
     renderNews('member-news-grid', 'member-news-date', messages);
@@ -1093,6 +1097,8 @@ function doLogout() {
   walkieChannelReady = false;
   onlineSubscribers = {};
   stopWalkieAudio();
+  stopTts();
+  lastReadMessageId = 0;
   document.getElementById('member-page').classList.remove('active');
   document.getElementById('public-page').classList.add('active');
   document.getElementById('login-account').value = '';
@@ -1268,7 +1274,37 @@ let walkieIsPlaying = false;  // 播放锁
 let walkiePlaySegId = '';     // 当前播放的会话ID
 let walkiePlayIndex = 0;      // 当前播放到第几段
 let walkiePlayedCache = {};   // 已播放去重缓存 { segKey: timestamp }
+let lastReadMessageId = 0;    // 消息自动朗读：已朗读的最新消息ID
+let ttsQueue = [];            // TTS朗读队列
+let ttsSpeaking = false;      // TTS是否正在朗读
 
+// TTS语音朗读：将文字转为语音播放
+function speakText(text) {
+  if (!window.speechSynthesis || !text) return;
+  ttsQueue.push(text);
+  processTtsQueue();
+}
+function processTtsQueue() {
+  if (ttsSpeaking || ttsQueue.length === 0) return;
+  ttsSpeaking = true;
+  const text = ttsQueue.shift();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'zh-CN';
+  utterance.rate = 1.0;
+  utterance.pitch = 1.0;
+  // 尝试选择中文语音
+  const voices = speechSynthesis.getVoices();
+  const zhVoice = voices.find(v => v.lang.startsWith('zh'));
+  if (zhVoice) utterance.voice = zhVoice;
+  utterance.onend = () => { ttsSpeaking = false; processTtsQueue(); };
+  utterance.onerror = () => { ttsSpeaking = false; processTtsQueue(); };
+  speechSynthesis.speak(utterance);
+}
+function stopTts() {
+  ttsQueue = [];
+  ttsSpeaking = false;
+  if (window.speechSynthesis) speechSynthesis.cancel();
+}
 
 // 新消息实时通知：用Broadcast频道通知其他客户端刷新
 let messagesNotifyChannel = null;
@@ -1281,12 +1317,20 @@ function subscribeMessageChanges() {
     console.log('[实时消息] 收到新评论通知，立即刷新');
     try {
       const messages = await fetchMessages();
+      // 检测新消息（id > lastReadMessageId）用于TTS朗读
+      const newMsgs = messages.filter(m => m.id > lastReadMessageId);
       renderNews('member-news-grid', 'member-news-date', messages, true);
-      // 五子棋tab已移除，不再同步
-      // const gkGrid = document.getElementById('gk-news-grid');
-      // if (gkGrid && gkGrid.style.display !== 'none') {
-      //   gkRenderNews(messages);
-      // }
+      // 更新已朗读标记
+      if (messages.length > 0) {
+        const maxId = Math.max(...messages.map(m => m.id));
+        if (maxId > lastReadMessageId) lastReadMessageId = maxId;
+      }
+      // 如果开启了广播订阅，自动朗读新消息的文字
+      if (walkieSubscribed && newMsgs.length > 0) {
+        for (const msg of newMsgs) {
+          if (msg.text) speakText(msg.text);
+        }
+      }
     } catch (err) {
       console.error('[实时消息] 刷新失败:', err);
     }
@@ -1404,8 +1448,9 @@ function toggleWalkieSub() {
   } else {
     toggle.classList.remove('on');
     icon.innerHTML = ICO.speakerOff;
-    // 关闭时隐藏广播条，停掉正在播放的音频
+    // 关闭时隐藏广播条，停掉正在播放的音频和TTS朗读
     stopWalkieAudio();
+    stopTts();
     document.getElementById('walkie-broadcast-bar').classList.remove('show');
     setGuestIdBroadcasting(false);
   }
