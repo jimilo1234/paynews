@@ -1333,17 +1333,23 @@ function subscribeMessageChanges() {
     console.log('[实时消息] 收到新评论通知，立即刷新');
     try {
       const messages = await fetchMessages();
-      // 检测新消息（id > lastPlayedAudioMsgId）用于自动播放语音
-      const newMsgs = messages.filter(m => m.id > lastPlayedAudioMsgId);
-      renderNews('member-news-grid', 'member-news-date', messages, true);
+      // 只关注来自其他用户的新消息（排除自己发的）
+      const otherNewMsgs = messages.filter(m => m.id > lastPlayedAudioMsgId && m.username !== currentUser?.username);
+      // 只有其他用户发了新消息才触发标题更新和视觉变化
+      if (otherNewMsgs.length > 0) {
+        renderNews('member-news-grid', 'member-news-date', messages, true);
+      } else {
+        // 自己的消息仍需刷新列表，但不触发标题/颜色变化
+        renderNews('member-news-grid', 'member-news-date', messages, false);
+      }
       // 更新已播放标记
       if (messages.length > 0) {
         const maxId = Math.max(...messages.map(m => m.id));
         if (maxId > lastPlayedAudioMsgId) lastPlayedAudioMsgId = maxId;
       }
-      // 如果开启了广播订阅，自动播放新消息中的语音
-      if (walkieSubscribed && newMsgs.length > 0) {
-        for (const msg of newMsgs) {
+      // 如果开启了广播订阅，自动播放新消息中的语音（仅限其他用户）
+      if (walkieSubscribed && otherNewMsgs.length > 0) {
+        for (const msg of otherNewMsgs) {
           if (msg.audio_url) autoPlayVoiceMessage(msg.audio_url);
         }
       }
