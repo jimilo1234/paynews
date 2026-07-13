@@ -660,6 +660,7 @@ let pendingImageFile = null;  // File object for upload
 let pendingVideoFile = null;  // Video file object for upload
 let lastMessageSnapshot = '';  // 用于检测新消息
 let hasNewMessages = false;  // 标记是否有新消息（监管动态变紫）
+const originalTitle = document.title;  // 保存原始标题，用于重置
 // 在线状态追踪：记录哪些账号在线且订阅了广播
 let onlineSubscribers = {};  // { username: true } — 在线且订阅广播的账号
 
@@ -1144,6 +1145,9 @@ async function doSendMessage() {
 
     // 刷新留言
     hasNewMessages = false;  // 发送消息后恢复颜色
+    document.title = originalTitle;  // 重置标题，清除1.0提示
+    const dateEl = document.getElementById('member-news-date');
+    if (dateEl) dateEl.classList.remove('has-update');  // 清除红色标记
     const messages = await fetchMessages();
     renderNews('member-news-grid', 'member-news-date', messages);
     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
@@ -1321,6 +1325,11 @@ function subscribeMessageChanges() {
       } else {
         // 自己的消息仍需刷新列表，但不触发标题/颜色变化
         renderNews('member-news-grid', 'member-news-date', messages, false);
+        // 无其他用户新消息时，重置标题和视觉提示
+        document.title = originalTitle;
+        hasNewMessages = false;
+        const dateEl2 = document.getElementById('member-news-date');
+        if (dateEl2) dateEl2.classList.remove('has-update');
       }
       // 更新已播放标记
       if (messages.length > 0) {
