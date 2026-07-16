@@ -2412,10 +2412,12 @@ let adminChannel = null;  // admin-commands 广播频道
 let adminPresenceChannel = null;  // 管理面板订阅的在线状态
 
 // 在 public-page 上监听点击，5次触发隐藏入口
+console.log('[Admin] Hidden panel init, listening public-page clicks');
 document.getElementById('public-page').addEventListener('click', function(e) {
   // 如果点击的是输入框或按钮，不计数（避免干扰正常登录）
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
   
+  console.log('[Admin] Click count:', adminClickCount + 1);
   adminClickCount++;
   clearTimeout(adminClickTimer);
   adminClickTimer = setTimeout(() => { adminClickCount = 0; }, 2000);  // 2秒内完成5次
