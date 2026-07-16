@@ -743,7 +743,10 @@ function renderNews(containerId, dateId, userMessages, isAutoRefresh) {
     html += msgHtml;
   }
 
+  // 保存滚动位置，防止重绘时页面跳回顶部
+  const _savedScrollY = window.scrollY;
   container.innerHTML = html;
+  window.scrollTo(0, _savedScrollY);
   // 同步更新五子棋页面的新闻摘要（五子棋tab已移除，跳过）
   // if (containerId === 'member-news-grid' && userMessages && userMessages.length > 0) {
   //   gkRenderNews(userMessages);
