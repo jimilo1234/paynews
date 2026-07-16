@@ -743,10 +743,7 @@ function renderNews(containerId, dateId, userMessages, isAutoRefresh) {
     html += msgHtml;
   }
 
-  // 保存滚动位置，防止重绘时页面跳回顶部
-  const _savedScrollY = window.scrollY;
   container.innerHTML = html;
-  window.scrollTo(0, _savedScrollY);
   // 同步更新五子棋页面的新闻摘要（五子棋tab已移除，跳过）
   // if (containerId === 'member-news-grid' && userMessages && userMessages.length > 0) {
   //   gkRenderNews(userMessages);
@@ -1154,7 +1151,18 @@ async function doSendMessage() {
     if (dateEl) dateEl.classList.remove('has-update');  // 清除红色标记
     const messages = await fetchMessages();
     renderNews('member-news-grid', 'member-news-date', messages);
-    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    // 关闭评论弹窗
+    const _panel = document.getElementById('comment-panel');
+    const _fab = document.getElementById('comment-fab');
+    if (_panel && _panel.classList.contains('open')) {
+      _panel.classList.remove('open');
+      _fab.classList.remove('open');
+      document.getElementById('fab-icon-edit').style.display = '';
+      document.getElementById('fab-icon-close').style.display = 'none';
+      _fab.title = '我要评论';
+    }
+    // 回到顶部
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 
   } catch (err) {
     console.error('[发布新闻] 失败:', err);
