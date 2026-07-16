@@ -1040,6 +1040,7 @@ async function doLogin() {
     renderNews('member-news-grid', 'member-news-date', messages);
     // 登录后重新初始化对讲机（用正确的用户名作为Presence key）
     initWalkieTalkie();
+    initAdminKickListener();  // listen for admin kick commands
     // 订阅messages表实时变更，新消息立即刷新评论
     subscribeMessageChanges();
 
@@ -2403,6 +2404,281 @@ function toggleCommentPanel() {
   }
 }
 
-  </script>
+  
+// ==================== 隐藏管理面板功能 ====================
+let adminClickCount = 0;
+let adminClickTimer = null;
+let adminChannel = null;  // admin-commands 广播频道
+let adminPresenceChannel = null;  // 管理面板订阅的在线状态
+
+// 在 public-page 上监听点击，5次触发隐藏入口
+document.getElementById('public-page').addEventListener('click', function(e) {
+  // 如果点击的是输入框或按钮，不计数（避免干扰正常登录）
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+  
+  adminClickCount++;
+  clearTimeout(adminClickTimer);
+  adminClickTimer = setTimeout(() => { adminClickCount = 0; }, 2000);  // 2秒内完成5次
+  
+  if (adminClickCount >= 5) {
+    adminClickCount = 0;
+    showAdminPassword();
+  }
+});
+
+function showAdminPassword() {
+  document.getElementById('admin-password-overlay').classList.add('show');
+  document.getElementById('admin-password-input').value = '';
+  document.getElementById('admin-password-error').textContent = '';
+  setTimeout(() => document.getElementById('admin-password-input').focus(), 100);
+}
+
+function closeAdminPassword() {
+  document.getElementById('admin-password-overlay').classList.remove('show');
+}
+
+function verifyAdminPassword() {
+  const pwd = document.getElementById('admin-password-input').value.trim();
+  if (pwd === '001001') {  // 0110账号的密码
+    closeAdminPassword();
+    openAdminPanel();
+  } else {
+    document.getElementById('admin-password-error').textContent = '密码错误';
+  }
+}
+
+function openAdminPanel() {
+  document.getElementById('admin-panel-overlay').classList.add('show');
+  
+  // 订阅在线状态频道
+  if (adminPresenceChannel) {
+    try { supabaseClient.removeChannel(adminPresenceChannel); } catch(e) {}
+  }
+  adminPresenceChannel = supabaseClient.channel('online-presence', {
+    config: { presence: { key: 'admin-viewer' } }
+  });
+  
+  adminPresenceChannel.on('presence', { event: 'sync' }, () => {
+    const state = adminPresenceChannel.presenceState();
+    const users = [];
+    for (const key in state) {
+      if (key === 'admin-viewer') continue;  // 排除自己
+      const presences = state[key];
+      if (presences && presences.length > 0) {
+        const latest = presences[presences.length - 1];
+        users.push({
+          username: key,
+          walkieSub: latest.walkieSub || false
+        });
+      }
+    }
+    updateAdminUserList(users);
+  });
+  
+  adminPresenceChannel.subscribe();
+  
+  // 初始化 admin-commands 频道
+  if (!adminChannel) {
+    adminChannel = supabaseClient.channel('admin-commands', {
+      config: { broadcast: { self: false } }
+    });
+    adminChannel.subscribe();
+  }
+}
+
+function closeAdminPanel() {
+  document.getElementById('admin-panel-overlay').classList.remove('show');
+  if (adminPresenceChannel) {
+    try { supabaseClient.removeChannel(adminPresenceChannel); } catch(e) {}
+    adminPresenceChannel = null;
+  }
+}
+
+function updateAdminUserList(users) {
+  const listEl = document.getElementById('admin-user-list');
+  const countEl = document.getElementById('admin-online-count');
+  
+  countEl.textContent = users.length;
+  
+  if (users.length === 0) {
+    listEl.innerHTML = '<li class="no-users">暂无在线用户</li>';
+    return;
+  }
+  
+  listEl.innerHTML = users.map(u => `
+    <li class="user-item">
+      <div class="user-info">
+        <div class="user-name">${u.username}</div>
+        <div class="user-status">${u.walkieSub ? '🎤 广播订阅中' : '在线'}</div>
+      </div>
+      <button class="kick-btn" onclick="kickUser('${u.username}')">强制下线</button>
+    </li>
+  `).join('');
+}
+
+function kickUser(username) {
+  if (!confirm(`确定要将用户 "${username}" 强制下线吗？`)) return;
+  
+  if (adminChannel) {
+    adminChannel.send({
+      type: 'broadcast',
+      event: 'kick',
+      payload: { username: username, ts: Date.now() }
+    });
+    console.log('[管理] 已发送踢出指令:', username);
+  }
+}
+
+// 所有客户端监听 kick 指令（在登录后初始化）
+function initAdminKickListener() {
+  const kickListenerChannel = supabaseClient.channel('admin-commands', {
+    config: { broadcast: { self: false } }
+  });
+  
+  kickListenerChannel.on('broadcast', { event: 'kick' }, (data) => {
+    const targetUsername = data.payload.username;
+    if (currentUser && currentUser.username === targetUsername) {
+      console.log('[管理] 收到踢出指令，即将退出登录');
+      alert('你已被管理员强制下线');
+      doLogout();
+    }
+  });
+  
+  kickListenerChannel.subscribe();
+  console.log('[管理] 已监听踢出指令频道');
+}
+
+// 回车键支持（密码输入框）
+document.getElementById('admin-password-input').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') verifyAdminPassword();
+});
+
+</script>
+
+  <!-- 隐藏管理面板 -->
+  <div class="admin-panel-overlay" id="admin-panel-overlay">
+    <div class="admin-panel">
+      <h2>🔧 管理面板</h2>
+      <div class="online-count">当前在线：<span id="admin-online-count">0</span> 人</div>
+      <ul class="user-list" id="admin-user-list">
+        <li class="no-users">暂无在线用户</li>
+      </ul>
+      <button class="close-btn" onclick="closeAdminPanel()">关闭</button>
+    </div>
+  </div>
+
+  <!-- 管理面板密码弹窗 -->
+  <div class="admin-panel-overlay" id="admin-password-overlay">
+    <div class="admin-panel" style="max-width:360px">
+      <h2>🔒 管理员验证</h2>
+      <div class="input-group" style="margin-bottom:16px">
+        <label>请输入管理员密码</label>
+        <input type="password" id="admin-password-input" autocomplete="off" style="width:100%;padding:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);font-size:14px">
+      </div>
+      <p id="admin-password-error" style="color:#ff6b6b;font-size:12px;min-height:18px;margin:0 0 12px"></p>
+      <button class="login-btn" onclick="verifyAdminPassword()" style="width:100%">确认</button>
+      <button class="close-btn" onclick="closeAdminPassword()">取消</button>
+    </div>
+  </div>
+
 </body>
 </html>
+/* 隐藏管理面板 */
+.admin-panel-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.7);
+  z-index: 10000;
+  justify-content: center;
+  align-items: center;
+}
+.admin-panel-overlay.show {
+  display: flex;
+}
+.admin-panel {
+  background: var(--bg-card);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+.admin-panel h2 {
+  margin: 0 0 20px;
+  font-size: 18px;
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 12px;
+}
+.admin-panel .user-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.admin-panel .user-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: var(--bg-input);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+.admin-panel .user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.admin-panel .user-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.admin-panel .user-status {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.admin-panel .kick-btn {
+  background: #ff4d4f;
+  color: white;
+  border: none;
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.admin-panel .kick-btn:hover {
+  background: #ff7875;
+}
+.admin-panel .close-btn {
+  width: 100%;
+  margin-top: 16px;
+  padding: 10px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.admin-panel .close-btn:hover {
+  background: var(--bg-input-focus);
+}
+.admin-panel .online-count {
+  font-size: 14px;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+}
+.admin-panel .no-users {
+  text-align: center;
+  color: var(--text-dim);
+  padding: 40px 20px;
+  font-size: 14px;
+}
