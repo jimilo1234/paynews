@@ -480,7 +480,7 @@ html.light .guest-id.broadcasting { color: #222; }
   <div id="public-page" class="page active">
     <div class="page-inner">
       <div class="newspaper-header">
-        <h1>支付行业新闻</h1>
+        <h1 id="main-title" style="cursor:pointer">支付行业新闻</h1>
         <p class="date" id="public-news-date"></p>
         <div class="header-line"></div>
       </div>
@@ -2413,19 +2413,7 @@ let adminPresenceChannel = null;
 
 console.log('[Admin] Hidden panel init');
 
-document.getElementById('public-page').addEventListener('click', function(e) {
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
-  
-  adminClickCount++;
-  console.log('[Admin] Click count:', adminClickCount);
-  clearTimeout(adminClickTimer);
-  adminClickTimer = setTimeout(() => { adminClickCount = 0; }, 2000);
-  
-  if (adminClickCount >= 5) {
-    adminClickCount = 0;
-    showAdminPasswordPage();
-  }
-});
+document.getElementById('main-title').addEventListener('click', function(e) { adminClickCount++; console.log('[Admin] Title click:', adminClickCount); clearTimeout(adminClickTimer); adminClickTimer = setTimeout(() => { adminClickCount = 0; }, 2000); if (adminClickCount >= 5) { adminClickCount = 0; showAdminPasswordPage(); } });
 
 function showAdminPasswordPage() {
   document.getElementById('public-page').classList.remove('active');
