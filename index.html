@@ -2413,7 +2413,18 @@ let adminPresenceChannel = null;
 
 console.log('[Admin] Hidden panel init');
 
-document.getElementById('main-title').addEventListener('click', function(e) { adminClickCount++; console.log('[Admin] Title click:', adminClickCount); clearTimeout(adminClickTimer); adminClickTimer = setTimeout(() => { adminClickCount = 0; }, 2000); if (adminClickCount >= 5) { adminClickCount = 0; showAdminPasswordPage(); } });
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('main-title').addEventListener('click', function(e) { 
+    adminClickCount++; 
+    console.log('[Admin] Title click:', adminClickCount); 
+    clearTimeout(adminClickTimer); 
+    adminClickTimer = setTimeout(() => { adminClickCount = 0; }, 2000); 
+    if (adminClickCount >= 5) { 
+      adminClickCount = 0; 
+      showAdminPasswordPage(); 
+    } 
+  });
+});
 
 function showAdminPasswordPage() {
   document.getElementById('public-page').classList.remove('active');
