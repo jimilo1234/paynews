@@ -389,6 +389,8 @@ html.light .guest-id.broadcasting { color: #222; }
   transition: opacity 0.2s, transform 0.2s;
 }
 .comment-panel.open { display: flex; }
+/* 面板打开时，内容区增加底部留白，让内容上移 */
+.page-inner.has-comment-panel { padding-bottom: 380px !important; }
 /* comment-panel-title removed */
 .message-input-area {
   position: static; background: none; backdrop-filter: none;
@@ -428,6 +430,7 @@ html.light .guest-id.broadcasting { color: #222; }
 /* 手机端适配 */
 @media (max-width: 767px) {
   .comment-panel { right: 8px; left: 8px; width: auto; bottom: 68px; }
+  .page-inner.has-comment-panel { padding-bottom: 440px !important; }
   .comment-fab { right: 12px; bottom: 12px; width: 44px; height: 44px; }
 }
 .input-side-btns .walkie-btn {
@@ -1260,6 +1263,9 @@ async function doSendMessage() {
       document.getElementById('fab-icon-edit').style.display = '';
       document.getElementById('fab-icon-close').style.display = 'none';
       _fab.title = '我要评论';
+      // 移除内容上移的class
+      const _pageInner = document.querySelector('.page.active .page-inner');
+      if (_pageInner) _pageInner.classList.remove('has-comment-panel');
     }
     // 回到顶部
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2498,18 +2504,22 @@ function toggleCommentPanel() {
   const iconEdit = document.getElementById('fab-icon-edit');
   const iconClose = document.getElementById('fab-icon-close');
   const isOpen = panel.classList.contains('open');
+  // 找到当前激活页面的 page-inner（用于内容上移）
+  const activePageInner = document.querySelector('.page.active .page-inner');
   if (isOpen) {
     panel.classList.remove('open');
     fab.classList.remove('open');
     iconEdit.style.display = '';
     iconClose.style.display = 'none';
     fab.title = '我要评论';
+    if (activePageInner) activePageInner.classList.remove('has-comment-panel');
   } else {
     panel.classList.add('open');
     fab.classList.add('open');
     iconEdit.style.display = 'none';
     iconClose.style.display = '';
     fab.title = '收起';
+    if (activePageInner) activePageInner.classList.add('has-comment-panel');
     // 聚焦到输入框
     setTimeout(() => { const ta = document.getElementById('msg-text'); if(ta) ta.focus(); }, 200);
   }
