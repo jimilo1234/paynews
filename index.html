@@ -1197,6 +1197,8 @@ function doLogout() {
   if (aiTabLogout) aiTabLogout.style.display = 'none';
   // 刷新公共页留言
   loadPublicMessages();
+  // 回到登录页顶部
+  window.scrollTo({ top: 0, behavior: 'instant' });
 }
 
 async function doSendMessage() {
