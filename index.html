@@ -786,12 +786,24 @@ function renderNews(containerId, dateId, userMessages, isAutoRefresh) {
   dateEl.textContent = getDateStr();
 
   // 自动刷新时检测新消息 → 日期变红 + 监管动态变紫
+  // 只有其他用户的消息才触发1.0提示，自己发的消息不触发
   if (dateId === 'member-news-date') {
     const newSnapshot = userMessages.map(m => m.id || m.created_at).join(',');
     if (isAutoRefresh && lastMessageSnapshot && newSnapshot !== lastMessageSnapshot) {
-      dateEl.classList.add('has-update');
-      document.title = '支付行业新闻1.0';
-      hasNewMessages = true;  // 标记有新消息
+      // 检查新消息是否只来自当前用户
+      const lastIds = lastMessageSnapshot ? lastMessageSnapshot.split(',') : [];
+      const newIds = newSnapshot.split(',');
+      const addedIds = newIds.filter(id => !lastIds.includes(id));
+      // 只取新增消息中非当前用户的消息来判断是否显示1.0
+      const addedOtherMsgs = userMessages.filter(m => 
+        addedIds.includes(String(m.id || m.created_at)) && 
+        m.username !== currentUser?.username
+      );
+      if (addedOtherMsgs.length > 0) {
+        dateEl.classList.add('has-update');
+        document.title = '支付行业新闻1.0';
+        hasNewMessages = true;
+      }
     }
     lastMessageSnapshot = newSnapshot;
   }
