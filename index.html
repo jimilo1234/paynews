@@ -226,6 +226,10 @@ html.light .walkie-sub-toggle.on .toggle-knob { background: var(--accent-light);
 .gk-stone.white { background: radial-gradient(circle at 35% 35%, #fff, #ccc); border: 1px solid rgba(0,0,0,0.15); }
 
 .news-grid { max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; padding-top: 16px; }
+.refresh-news-bar { text-align: right; padding: 4px 0 0 0; }
+.refresh-news-btn { font-size: 12px; color: var(--text-dim); cursor: pointer; opacity: 0.6; transition: opacity 0.2s; user-select: none; }
+.refresh-news-btn:hover { opacity: 1; color: var(--accent); }
+
 @media (max-width: 767px) {
   .login-card { max-width: 100%; padding: 20px; }
   .login-card .input-group { display: block; width: 100%; margin-right: 0 !important; }
@@ -635,6 +639,7 @@ html.light .guest-id.broadcasting { color: #222; }
       </div>
       <!-- Tab 内容区 -->
       <div class="tab-panel active" id="tab-news">
+        <div class="refresh-news-bar"><span class="refresh-news-btn" onclick="fetchLatestNews()">获取最新新闻</span></div>
         <div class="news-grid" id="member-news-grid"></div>
       </div>
       <!-- AI助手 tab：iframe嵌入 -->
@@ -732,7 +737,7 @@ try {
 }
 
 // ===== 静态新闻数据 =====
-const MOCK_NEWS = [
+let MOCK_NEWS = [
   { category: '监管动态', title: '汇聚支付被罚没超452万元，已逐条落实整改', summary: '因违反支付结算管理规定，汇聚支付被央行广东分行罚没452.62万元。公司回应称已全部整改完毕并升级合规体系，包括重新梳理商户准入流程、强化交易监控能力、完善反洗钱内控机制等。业内分析认为，这是今年央行加大对收单机构违规行为处罚力度的一个缩影。' },
   { category: '监管动态', title: '收单外包3万家备案后进入下半场，推荐函不能再走形式', summary: '支付清算协会发布新通知，要求收单机构对外包机构尽调、聚合支付技术审核、本地化经营全面从严管理。此前行业内普遍存在的"推荐函走过场"现象将被重点整治，预计将有大量不符合要求的外包服务商被清退，收单市场格局面临重塑。' },
   { category: '监管动态', title: '杉德支付牌照续展申请被中止，6月24日将与广发对簿公堂', summary: '杉德支付因多项违规行为，牌照续展审查被中止审查，这是本月第二家支付机构遭遇类似情况。与此同时，杉德与广发银行之间的纠纷案将于6月24日开庭审理，涉及金额超2亿元。杉德支付此前已被列入经营异常名录，业务开展受限。' },
@@ -754,6 +759,9 @@ const MOCK_NEWS = [
   { category: '跨境支付', title: '英国上线自主支付体系UKPI，打破美国卡组织垄断', summary: '由英国主流银行与金融科技企业联合组建的UKPI（United Kingdom Payment Infrastructure）正式上线，首日接入银行12家、商户8万家。UKPI采用分布式账本技术，交易成本较Visa/Mastercard降低40%，结算速度从T+1提升至实时。此举被视为欧洲支付自主化的重要一步。' },
   { category: '技术趋势', title: '扫码支付占比从峰值95%下滑至90%，生物识别+AI支付一年增长3倍', summary: '中国移动支付市场格局出现结构性变化，扫码支付市场份额首次出现连续下滑。AI付、碰一碰、刷掌支付快速崛起，新支付方式交易笔数一年增长3倍，占比从2%升至8%。预计2028年新支付占比将突破50%，支付行业将迎来近十年来最大技术代际更替。' },
 ];
+
+// 从localStorage加载已保存的新闻数据（如果存在）
+try { var savedNews = localStorage.getItem("paynews_data"); if (savedNews) { var parsed = JSON.parse(savedNews); if (Array.isArray(parsed) && parsed.length > 0) { MOCK_NEWS.splice(0, MOCK_NEWS.length, ...parsed); } } } catch(e) {}
 
 // ===== 全局状态 =====
 let currentUser = null;  // { username, displayName }
@@ -777,6 +785,37 @@ function showOverlay(src) {
 function getDateStr() {
   const now = new Date();
   return `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日 · 每日简报`;
+}
+
+// ===== 获取最新新闻 =====
+async function fetchLatestNews() {
+  const btn = document.querySelector(".refresh-news-btn");
+  if (!btn || btn.classList.contains("loading")) return;
+  btn.classList.add("loading");
+  btn.textContent = "获取中...";
+  try {
+    const rssUrl = encodeURIComponent("https://news.google.com/rss/search?q=%E8%81%9A%E5%90%88%E6%94%AF%E4%BB%98+%E6%94%AF%E4%BB%98%E8%A1%8C%E4%B8%9A&hl=zh-CN&gl=CN&ceid=CN:zh-Hans");
+    const resp = await fetch("https://api.rss2json.com/v1/api.json?rss_url=" + rssUrl);
+    const data = await resp.json();
+    if (data.status === "ok" && data.items && data.items.length > 0) {
+      const cats = ["监管动态","支付公司","数字人民币","跨境支付","技术趋势","监管动态","支付公司","数字人民币","跨境支付","技术趋势","监管动态","支付公司","数字人民币","跨境支付","技术趋势","监管动态","支付公司","数字人民币","跨境支付","技术趋势"];
+      const count = MOCK_NEWS.length;
+      const newNews = data.items.slice(0, count).map(function(item, i) {
+        var title = item.title.replace(/^.*?\s*-\s*/, "");
+        var desc = item.description ? item.description.replace(/<[^>]*>/g, "").substring(0, 100) + "…" : "点击查看详情";
+        return { category: cats[i % cats.length], title: title.substring(0, 60), summary: desc };
+      });
+      MOCK_NEWS.splice(0, MOCK_NEWS.length);
+      newNews.forEach(function(n) { MOCK_NEWS.push(n); });
+      localStorage.setItem("paynews_data", JSON.stringify(MOCK_NEWS));
+      var msgs = await fetchMessages();
+      renderNews("member-news-grid", "member-news-date", msgs, false);
+    }
+  } catch(e) {
+    console.error("获取新闻失败:", e);
+  }
+  btn.classList.remove("loading");
+  btn.textContent = "获取最新新闻";
 }
 
 // ===== 渲染新闻 =====
