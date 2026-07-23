@@ -819,21 +819,38 @@ async function fetchLatestNews() {
       }
     }
     if (uniqueItems.length > 0) {
+      // 使用 DeepSeek AI 增强新闻内容质量
       const cats = ["监管动态","支付公司","数字人民币","跨境支付","技术趋势","监管动态","支付公司","数字人民币","跨境支付","技术趋势","监管动态","支付公司","数字人民币","跨境支付","技术趋势","监管动态","支付公司","数字人民币","跨境支付","技术趋势"];
       const count = MOCK_NEWS.length;
-      const newNews = uniqueItems.slice(0, count).map(function(item, i) {
-        // 清理标题：去掉末尾的 " - 来源名"（如" - 新浪财经"）
+      const rawItems = uniqueItems.slice(0, count).map(function(item) {
+        return { title: item.title, description: item.description };
+      });
+      var enhancedItems = [];
+      try {
+        var enhanceResp = await fetch("https://wwxzycfdfyyljkjfcbjt.supabase.co/functions/v1/enhance-news", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + SUPABASE_KEY },
+          body: JSON.stringify({ items: rawItems })
+        });
+        if (enhanceResp.ok) {
+          var enhanceData = await enhanceResp.json();
+          if (enhanceData.items && enhanceData.items.length > 0) {
+            enhancedItems = enhanceData.items;
+          }
+        }
+      } catch(e) { console.error("AI增强失败，使用原始处理:", e); }
+
+      // 如果AI增强成功则使用增强结果，否则使用基本处理结果
+      const newNews = enhancedItems.length > 0 ? enhancedItems.map(function(item, i) {
+        return { category: cats[i % cats.length], title: item.title, summary: item.summary };
+      }) : uniqueItems.slice(0, count).map(function(item, i) {
         var title = item.title.replace(/\s*-\s*[^-\s]+$/, "").trim();
-        // 如果标题还是太长或有乱码，做基本清理
         title = title.replace(/^<!--.*?-->/, "").trim();
-        // 清理描述：去掉HTML标签，保留完整内容
         var desc = "";
         if (item.description) {
           desc = item.description.replace(/<[^>]*>/g, "").trim();
-          // 去掉常见的"查看更多"类尾巴
           desc = desc.replace(/…\s*$/, "").replace(/\.\.\.\s*$/, "").trim();
         }
-        // 如果描述太短（某些RSS项只有一句话），尝试用标题补充
         if (desc.length < 40) desc = title + "。" + (desc.length > 0 ? desc : "最新行业动态，点击查看详情。");
         return { category: cats[i % cats.length], title: title, summary: desc };
       });
