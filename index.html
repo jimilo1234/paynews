@@ -842,7 +842,7 @@ async function fetchLatestNews() {
 
       // 如果AI增强成功则使用增强结果，否则使用基本处理结果
       const newNews = enhancedItems.length > 0 ? enhancedItems.map(function(item, i) {
-        return { category: cats[i % cats.length], title: item.title, summary: item.summary };
+        return { category: item.category || cats[i % cats.length], title: item.title, summary: item.summary };
       }) : uniqueItems.slice(0, count).map(function(item, i) {
         var title = item.title.replace(/\s*-\s*[^-\s]+$/, "").trim();
         title = title.replace(/^<!--.*?-->/, "").trim();
