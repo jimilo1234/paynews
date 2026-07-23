@@ -787,23 +787,55 @@ function getDateStr() {
   return `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日 · 每日简报`;
 }
 
-// ===== 获取最新新闻 =====
+// ===== 获取最新新闻（从多个RSS源合并，保留完整标题和详细摘要） =====
 async function fetchLatestNews() {
   const btn = document.querySelector(".refresh-news-btn");
   if (!btn || btn.classList.contains("loading")) return;
   btn.classList.add("loading");
   btn.textContent = "获取中...";
   try {
-    const rssUrl = encodeURIComponent("https://news.google.com/rss/search?q=%E8%81%9A%E5%90%88%E6%94%AF%E4%BB%98+%E6%94%AF%E4%BB%98%E8%A1%8C%E4%B8%9A&hl=zh-CN&gl=CN&ceid=CN:zh-Hans");
-    const resp = await fetch("https://api.rss2json.com/v1/api.json?rss_url=" + rssUrl);
-    const data = await resp.json();
-    if (data.status === "ok" && data.items && data.items.length > 0) {
+    // 同时从多个关键词搜索 Google News，获取更丰富的新闻
+    var rssQueries = [
+      "https://news.google.com/rss/search?q=%E8%81%9A%E5%90%88%E6%94%AF%E4%BB%98&hl=zh-CN&gl=CN&ceid=CN:zh-Hans",
+      "https://news.google.com/rss/search?q=%E6%94%AF%E4%BB%98%E8%A1%8C%E4%B8%9A&hl=zh-CN&gl=CN&ceid=CN:zh-Hans",
+      "https://news.google.com/rss/search?q=%E6%94%AF%E4%BB%98%E6%96%B0%E9%97%BB&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
+    ];
+    var allItems = [];
+    for (var qi = 0; qi < rssQueries.length; qi++) {
+      try {
+        var r = await fetch("https://api.rss2json.com/v1/api.json?rss_url=" + encodeURIComponent(rssQueries[qi]));
+        var d = await r.json();
+        if (d.status === "ok" && d.items) allItems = allItems.concat(d.items);
+      } catch(e) {}
+    }
+    // 去重（按link去重）
+    var seen = {};
+    var uniqueItems = [];
+    for (var si = 0; si < allItems.length; si++) {
+      var link = allItems[si].link || allItems[si].guid || "";
+      if (!seen[link]) {
+        seen[link] = true;
+        uniqueItems.push(allItems[si]);
+      }
+    }
+    if (uniqueItems.length > 0) {
       const cats = ["监管动态","支付公司","数字人民币","跨境支付","技术趋势","监管动态","支付公司","数字人民币","跨境支付","技术趋势","监管动态","支付公司","数字人民币","跨境支付","技术趋势","监管动态","支付公司","数字人民币","跨境支付","技术趋势"];
       const count = MOCK_NEWS.length;
-      const newNews = data.items.slice(0, count).map(function(item, i) {
-        var title = item.title.replace(/^.*?\s*-\s*/, "");
-        var desc = item.description ? item.description.replace(/<[^>]*>/g, "").substring(0, 100) + "…" : "点击查看详情";
-        return { category: cats[i % cats.length], title: title.substring(0, 60), summary: desc };
+      const newNews = uniqueItems.slice(0, count).map(function(item, i) {
+        // 清理标题：去掉末尾的 " - 来源名"（如" - 新浪财经"）
+        var title = item.title.replace(/\s*-\s*[^-\s]+$/, "").trim();
+        // 如果标题还是太长或有乱码，做基本清理
+        title = title.replace(/^<!--.*?-->/, "").trim();
+        // 清理描述：去掉HTML标签，保留完整内容
+        var desc = "";
+        if (item.description) {
+          desc = item.description.replace(/<[^>]*>/g, "").trim();
+          // 去掉常见的"查看更多"类尾巴
+          desc = desc.replace(/…\s*$/, "").replace(/\.\.\.\s*$/, "").trim();
+        }
+        // 如果描述太短（某些RSS项只有一句话），尝试用标题补充
+        if (desc.length < 40) desc = title + "。" + (desc.length > 0 ? desc : "最新行业动态，点击查看详情。");
+        return { category: cats[i % cats.length], title: title, summary: desc };
       });
       MOCK_NEWS.splice(0, MOCK_NEWS.length);
       newNews.forEach(function(n) { MOCK_NEWS.push(n); });
