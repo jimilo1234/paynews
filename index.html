@@ -1369,8 +1369,10 @@ async function doSendMessage() {
       const _pageInner = document.querySelector('.page.active .page-inner');
       if (_pageInner) _pageInner.classList.remove('has-comment-panel');
     }
-    // 回到顶部
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // 回到顶部（仅0110用户）
+    if (currentUser && currentUser.username === '0110') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
 
   } catch (err) {
     console.error('[发布新闻] 失败:', err);
@@ -2794,12 +2796,4 @@ document.getElementById('admin-password-input').addEventListener('keydown', func
         <ul id="admin-user-list" style="list-style:none;padding:0;margin:0">
           <li style="text-align:center;color:var(--text-dim);padding:40px 20px;font-size:14px">暂无在线用户</li>
         </ul>
-        <button onclick="exitAdminPanel()" style="width:100%;margin-top:24px;padding:12px;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:14px">退出管理</button>
-      </div>
-    </div>
-  </div>
-
-
-
-</body>
-</html>
+        <button onclick="exitAdminPanel()" style="width:100%;margin-top:24px;padding:12px;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-
