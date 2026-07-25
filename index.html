@@ -752,6 +752,8 @@ try {
     if (error || !data || data.length === 0 || !data[0].check_session) {
       // session已失效（被其他设备登录踢掉了）
       localStorage.removeItem('paynews_session');
+      // 通知父窗口（扩展侧边栏）清除缓存session
+      try { window.parent.postMessage({type: 'paynews-session-invalid'}, '*'); } catch(e) {}
       // 用户打开页面时会看到登录界面，无需额外操作
       console.log('[Session] 已失效，已清除本地session');
     }
@@ -1363,6 +1365,8 @@ function doLogout() {
   currentUser = null;
   mySessionId = '';
   localStorage.removeItem('paynews_session');
+  // 通知父窗口（扩展侧边栏）清除缓存session
+  try { window.parent.postMessage({type: 'paynews-session-invalid'}, '*'); } catch(e) {}
   pendingImage = null;
   pendingImageFile = null;
   pendingVideoFile = null;
