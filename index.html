@@ -2871,7 +2871,7 @@ function initAdminKickListener() {
     if (currentUser && currentUser.username === data.payload.username) {
       // 新设备登录踢下线（broadcast设置了self:false，不会踢到自己）
       if (data.payload.reason === 'new_login') {
-        alert('您的账号已在其他设备登录，当前设备已自动登出');
+        alert('新闻内容已经刷新');
         doLogout();
       } else {
         // 管理员踢下线
@@ -2895,7 +2895,7 @@ function startSessionHeartbeat() {
       });
       if (error || !data || data.length === 0 || !data[0].check_session) {
         // session已失效（被其他设备登录踢掉了）
-        alert('您的账号已在其他设备登录，当前设备已自动登出');
+        alert('新闻内容已经刷新');
         doLogout();
       }
     } catch(e) {
