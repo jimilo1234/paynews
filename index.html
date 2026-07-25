@@ -736,6 +736,30 @@ try {
   console.error('Supabase 初始化失败:', e);
 }
 
+// 检查是否有保存的session，尝试恢复登录
+(async function restoreSession() {
+  if (!supabaseClient) return;
+  try {
+    const saved = localStorage.getItem('paynews_session');
+    if (!saved) return;
+    const { username, session_id } = JSON.parse(saved);
+    if (!username || !session_id) return;
+    
+    const { data, error } = await supabaseClient.rpc('check_session', {
+      p_username: username,
+      p_session_id: session_id
+    });
+    if (error || !data || data.length === 0 || !data[0].check_session) {
+      // session已失效（被其他设备登录踢掉了）
+      localStorage.removeItem('paynews_session');
+      // 用户打开页面时会看到登录界面，无需额外操作
+      console.log('[Session] 已失效，已清除本地session');
+    }
+  } catch(e) {
+    console.error('[Session] 恢复检查失败:', e);
+  }
+})();
+
 // ===== 静态新闻数据 =====
 let MOCK_NEWS = [
   { category: '监管动态', title: '汇聚支付被罚没超452万元，已逐条落实整改', summary: '因违反支付结算管理规定，汇聚支付被央行广东分行罚没452.62万元。公司回应称已全部整改完毕并升级合规体系，包括重新梳理商户准入流程、强化交易监控能力、完善反洗钱内控机制等。业内分析认为，这是今年央行加大对收单机构违规行为处罚力度的一个缩影。' },
@@ -765,6 +789,7 @@ try { var savedNews = localStorage.getItem("paynews_data"); if (savedNews) { var
 
 // ===== 全局状态 =====
 let currentUser = null;  // { username, displayName }
+let mySessionId = '';  // 当前会话ID，用于单设备登录
 let loginTimeoutId = null;  // 0110账号2小时自动退出定时器
 let pendingImage = null;  // base64 preview
 let pendingImageFile = null;  // File object for upload
@@ -1010,14 +1035,49 @@ function copyComment(el, text) {
 // ===== Supabase 操作 =====
 
 // 登录验证
-async function verifyLogin(username, password) {
+// 登录+会话管理（验证密码，写入session，返回旧session信息）
+async function loginWithSession(username, password, sessionId) {
   if (!supabaseClient) throw new Error('Supabase 未初始化');
-  const { data, error } = await supabaseClient.rpc('verify_login', {
+  const { data, error } = await supabaseClient.rpc('login_with_session', {
     p_username: username,
-    p_password: password
+    p_password: password,
+    p_session_id: sessionId,
+    p_device_info: navigator.userAgent || ''
   });
   if (error) throw error;
-  return data; // [{ display_name: 'xxx' }] or []
+  return data; // [{ display_name, old_session_id, old_login_time }]
+}
+
+// 登出时清除session
+async function logoutSession(username, sessionId) {
+  if (!supabaseClient) return;
+  const { error } = await supabaseClient.rpc('logout_session', {
+    p_username: username,
+    p_session_id: sessionId
+  });
+  if (error) console.error('[登出] logout_session失败:', error);
+}
+
+// 广播踢下线通知（通过admin-commands channel）
+function broadcastKick(username, oldSessionId) {
+  try {
+    // 使用已有的admin-commands channel或临时创建
+    const ch = supabaseClient.channel('admin-commands', {
+      config: { broadcast: { self: false } }
+    });
+    ch.subscribe(function(status) {
+      if (status === 'SUBSCRIBED') {
+        ch.send({
+          type: 'broadcast',
+          event: 'kick',
+          payload: { username, session_id: oldSessionId, reason: 'new_login', ts: Date.now() }
+        });
+        setTimeout(function() { supabaseClient.removeChannel(ch); }, 2000);
+      }
+    });
+  } catch(e) {
+    console.error('[踢下线] 广播失败:', e);
+  }
 }
 
 // 获取所有留言
@@ -1217,16 +1277,31 @@ async function doLogin() {
   errorEl.textContent = '';
 
   try {
-    const result = await verifyLogin(account, password);
-    if (!result || result.length === 0) {
+    // 生成唯一会话ID
+    mySessionId = crypto.randomUUID();
+    
+    // 登录+会话管理（自动踢掉旧设备）
+    const sessionResult = await loginWithSession(account, password, mySessionId);
+    if (!sessionResult || sessionResult.length === 0) {
       errorEl.textContent = '活动火热，稍后再试';
       return;
     }
 
     currentUser = {
       username: account,
-      displayName: result[0].display_name
+      displayName: sessionResult[0].display_name
     };
+
+    // 如果有旧会话，通知老设备下线
+    if (sessionResult[0].old_session_id) {
+      broadcastKick(account, sessionResult[0].old_session_id);
+    }
+
+    // 保存session到localStorage，刷新后恢复
+    localStorage.setItem('paynews_session', JSON.stringify({
+      username: account,
+      session_id: mySessionId
+    }));
 
     // AI助手tab仅0110账号可见
     const aiTab = document.querySelector('.ai-only-tab');
@@ -1268,7 +1343,15 @@ async function doLogin() {
 function doLogout() {
   // 清除0110限时退出定时器
   if (loginTimeoutId) { clearTimeout(loginTimeoutId); loginTimeoutId = null; }
+  
+  // 清除服务端session
+  if (currentUser && mySessionId) {
+    logoutSession(currentUser.username, mySessionId).catch(e => console.error('[登出] session清理失败:', e));
+  }
+  
   currentUser = null;
+  mySessionId = '';
+  localStorage.removeItem('paynews_session');
   pendingImage = null;
   pendingImageFile = null;
   pendingVideoFile = null;
@@ -2750,8 +2833,15 @@ function initAdminKickListener() {
   const ch = supabaseClient.channel('admin-commands', { config: { broadcast: { self: false } } });
   ch.on('broadcast', { event: 'kick' }, (data) => {
     if (currentUser && currentUser.username === data.payload.username) {
-      alert('You have been kicked by admin');
-      doLogout();
+      // 新设备登录踢下线（broadcast设置了self:false，不会踢到自己）
+      if (data.payload.reason === 'new_login') {
+        alert('您的账号已在其他设备登录，当前设备已自动登出');
+        doLogout();
+      } else {
+        // 管理员踢下线
+        alert('You have been kicked by admin');
+        doLogout();
+      }
     }
   });
   ch.subscribe();
@@ -2796,4 +2886,12 @@ document.getElementById('admin-password-input').addEventListener('keydown', func
         <ul id="admin-user-list" style="list-style:none;padding:0;margin:0">
           <li style="text-align:center;color:var(--text-dim);padding:40px 20px;font-size:14px">暂无在线用户</li>
         </ul>
-        <button onclick="exitAdminPanel()" style="width:100%;margin-top:24px;padding:12px;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-
+        <button onclick="exitAdminPanel()" style="width:100%;margin-top:24px;padding:12px;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:14px">退出管理</button>
+      </div>
+    </div>
+  </div>
+
+
+
+</body>
+</html>
