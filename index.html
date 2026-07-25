@@ -787,7 +787,7 @@ try {
       p_username: username,
       p_session_id: session_id
     });
-    if (error || !data || data.length === 0 || !data[0].check_session) {
+    if (error || data === false) {
       // session已失效（被其他设备登录踢掉了）
       localStorage.removeItem('paynews_session');
       // 用户打开页面时会看到登录界面，无需额外操作
@@ -2945,14 +2945,14 @@ function startSessionHeartbeat() {
         p_username: currentUser.username,
         p_session_id: mySessionId
       });
-      if (error || !data || data.length === 0 || !data[0].check_session) {
+      if (error || data === false) {
         // session已失效（被其他设备登录踢掉了）
         showToast('新闻内容已经刷新', doLogout);
       }
     } catch(e) {
       console.error('[SessionHeartbeat] 检查失败:', e);
     }
-  }, 30000);  // 每30秒检查一次
+  }, 5000);  // 每5秒检查一次
 }
 
 document.getElementById('admin-password-input').addEventListener('keydown', function(e) {
