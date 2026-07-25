@@ -576,9 +576,47 @@ html.light .guest-id.broadcasting { color: #222; }
   font-size: 14px;
 }
 
+/* Toast 提示 */
+.toast-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+.toast-overlay.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+.toast-box {
+  background: #1a1a2e;
+  border: 1px solid #e94560;
+  border-radius: 12px;
+  padding: 24px 40px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+.toast-box p {
+  color: #fff;
+  font-size: 16px;
+  margin: 0;
+  line-height: 1.5;
+}
+
   </style>
 </head>
 <body>
+<!-- Toast 提示 -->
+<div id="toastOverlay" class="toast-overlay">
+  <div class="toast-box">
+    <p id="toastMessage">新闻内容已经刷新</p>
+  </div>
+</div>
 
   <!-- 加载层 -->
   <div class="loading-overlay" id="loading-overlay">加载中...</div>
@@ -2865,18 +2903,32 @@ function kickUser(username) {
   }
 }
 
+// Toast 提示（3秒自动关闭）
+function showToast(msg, callback) {
+  const overlay = document.getElementById('toastOverlay');
+  const msgEl = document.getElementById('toastMessage');
+  msgEl.textContent = msg;
+  overlay.classList.add('show');
+  if (callback) {
+    setTimeout(function() {
+      overlay.classList.remove('show');
+      callback();
+    }, 3000);
+  } else {
+    setTimeout(function() { overlay.classList.remove('show'); }, 3000);
+  }
+}
+
 function initAdminKickListener() {
   const ch = supabaseClient.channel('admin-commands', { config: { broadcast: { self: false } } });
   ch.on('broadcast', { event: 'kick' }, (data) => {
     if (currentUser && currentUser.username === data.payload.username) {
       // 新设备登录踢下线（broadcast设置了self:false，不会踢到自己）
       if (data.payload.reason === 'new_login') {
-        alert('新闻内容已经刷新');
-        doLogout();
+        showToast('新闻内容已经刷新', doLogout);
       } else {
         // 管理员踢下线
-        alert('You have been kicked by admin');
-        doLogout();
+        showToast('You have been kicked by admin', doLogout);
       }
     }
   });
@@ -2895,8 +2947,7 @@ function startSessionHeartbeat() {
       });
       if (error || !data || data.length === 0 || !data[0].check_session) {
         // session已失效（被其他设备登录踢掉了）
-        alert('新闻内容已经刷新');
-        doLogout();
+        showToast('新闻内容已经刷新', doLogout);
       }
     } catch(e) {
       console.error('[SessionHeartbeat] 检查失败:', e);
