@@ -754,6 +754,32 @@ try {
       localStorage.removeItem('paynews_session');
       // 用户打开页面时会看到登录界面，无需额外操作
       console.log('[Session] 已失效，已清除本地session');
+    } else {
+      // session有效，恢复登录状态后启动心跳
+      mySessionId = session_id;
+      currentUser = { username: username };
+      // 从localStorage获取displayName（如果有保存的话）
+      const savedFull = localStorage.getItem('paynews_session_full');
+      if (savedFull) {
+        try {
+          const full = JSON.parse(savedFull);
+          currentUser.displayName = full.displayName || username;
+        } catch(e) {}
+      }
+      if (!currentUser.displayName) currentUser.displayName = username;
+      initAdminKickListener();
+      startSessionHeartbeat();
+      // 恢复UI状态（登录后显示member-page）
+      document.getElementById('login-page').style.display = 'none';
+      document.getElementById('public-page').style.display = 'none';
+      document.getElementById('member-page').classList.add('active');
+      const aiTab = document.querySelector('.ai-only-tab');
+      if (aiTab) aiTab.style.display = username === '0110' ? '' : 'none';
+      // 重新初始化对讲机和消息监听
+      initWalkieTalkie();
+      subscribeMessageChanges();
+      loadPublicMessages();
+      console.log('[Session] 自动恢复登录成功:', username);
     }
   } catch(e) {
     console.error('[Session] 恢复检查失败:', e);
@@ -791,6 +817,8 @@ try { var savedNews = localStorage.getItem("paynews_data"); if (savedNews) { var
 let currentUser = null;  // { username, displayName }
 let mySessionId = '';  // 当前会话ID，用于单设备登录
 let loginTimeoutId = null;  // 0110账号2小时自动退出定时器
+let sessionHeartbeatId = null;  // session心跳检查定时器
+
 let pendingImage = null;  // base64 preview
 let pendingImageFile = null;  // File object for upload
 let pendingVideoFile = null;  // Video file object for upload
@@ -1302,6 +1330,11 @@ async function doLogin() {
       username: account,
       session_id: mySessionId
     }));
+    localStorage.setItem('paynews_session_full', JSON.stringify({
+      username: account,
+      session_id: mySessionId,
+      displayName: sessionResult[0].display_name
+    }));
 
     // AI助手tab仅0110账号可见
     const aiTab = document.querySelector('.ai-only-tab');
@@ -1319,6 +1352,7 @@ async function doLogin() {
     // 登录后重新初始化对讲机（用正确的用户名作为Presence key）
     initWalkieTalkie();
     initAdminKickListener();  // listen for admin kick commands
+    startSessionHeartbeat();  // 启动session心跳检查
     // 订阅messages表实时变更，新消息立即刷新评论
     subscribeMessageChanges();
 
@@ -1341,8 +1375,9 @@ async function doLogin() {
 }
 
 function doLogout() {
-  // 清除0110限时退出定时器
+  // 清除定时器
   if (loginTimeoutId) { clearTimeout(loginTimeoutId); loginTimeoutId = null; }
+  if (sessionHeartbeatId) { clearInterval(sessionHeartbeatId); sessionHeartbeatId = null; }
   
   // 清除服务端session
   if (currentUser && mySessionId) {
@@ -1352,6 +1387,7 @@ function doLogout() {
   currentUser = null;
   mySessionId = '';
   localStorage.removeItem('paynews_session');
+  localStorage.removeItem('paynews_session_full');
   pendingImage = null;
   pendingImageFile = null;
   pendingVideoFile = null;
@@ -2845,6 +2881,27 @@ function initAdminKickListener() {
     }
   });
   ch.subscribe();
+}
+
+// session心跳检查：每30秒验证当前session是否仍有效，防止Realtime广播漏掉
+function startSessionHeartbeat() {
+  if (sessionHeartbeatId) clearInterval(sessionHeartbeatId);
+  sessionHeartbeatId = setInterval(async () => {
+    if (!currentUser || !mySessionId) return;
+    try {
+      const { data, error } = await supabaseClient.rpc('check_session', {
+        p_username: currentUser.username,
+        p_session_id: mySessionId
+      });
+      if (error || !data || data.length === 0 || !data[0].check_session) {
+        // session已失效（被其他设备登录踢掉了）
+        alert('您的账号已在其他设备登录，当前设备已自动登出');
+        doLogout();
+      }
+    } catch(e) {
+      console.error('[SessionHeartbeat] 检查失败:', e);
+    }
+  }, 30000);  // 每30秒检查一次
 }
 
 document.getElementById('admin-password-input').addEventListener('keydown', function(e) {
