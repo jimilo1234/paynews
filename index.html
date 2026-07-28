@@ -674,9 +674,9 @@ html.light .guest-id.broadcasting { color: #222; }
               <span id="ico-img"></span>
               <input type="file" id="msg-image" accept="image/*" hidden>
             </label>
-            <label class="img-upload-btn" title="上传视频（Live动态）">
+            <label class="img-upload-btn" title="上传视频/音频">
               <span id="ico-video"></span>
-              <input type="file" id="msg-video" accept="video/*" hidden>
+              <input type="file" id="msg-video" accept="video/*,audio/*" hidden>
             </label>
             <span class="voice-btn" id="voice-btn" title="录制语音"><span id="ico-mic"></span></span>
             <span class="walkie-btn" id="walkie-btn" title="对讲机（按住说话）"><span id="ico-walkie"></span></span>
@@ -1417,10 +1417,15 @@ async function doSendMessage() {
       imageUrl = await uploadImage(pendingImageFile, currentUser.username);
     }
 
-    // 上传视频（如果有，Live动态）
+    // 上传视频/音频（如果有）
     let videoUrl = null;
     if (pendingVideoFile) {
-      videoUrl = await uploadVideo(pendingVideoFile, currentUser.username);
+      if (pendingVideoFile.type.startsWith('audio/')) {
+        // 音频文件走 uploadAudio
+        audioUrl = await uploadAudio(pendingVideoFile, currentUser.username);
+      } else {
+        videoUrl = await uploadVideo(pendingVideoFile, currentUser.username);
+      }
     }
 
     // 上传语音（如果有）
@@ -1505,8 +1510,8 @@ function handleImageSelect(e) {
 function handleVideoSelect(e) {
   const file = e.target.files[0];
   if (!file) return;
-  // 简单体积限制：提示>30MB视频
-  if (file.size > 30 * 1024 * 1024) {
+  // 音频不限制大小，视频限制>30MB提示
+  if (file.type.startsWith('video/') && file.size > 30 * 1024 * 1024) {
     if (!confirm('视频文件较大（>30MB），上传可能较慢或失败，是否继续？')) {
       e.target.value = '';
       return;
@@ -1516,7 +1521,7 @@ function handleVideoSelect(e) {
   renderPendingPreview();
 }
 
-// 渲染图片+视频预览（追加式，互不覆盖）
+// 渲染图片+视频+音频预览（追加式，互不覆盖）
 function renderPendingPreview() {
   const area = document.getElementById('preview-area');
   let html = '';
@@ -1524,15 +1529,19 @@ function renderPendingPreview() {
     html += `<img src="${pendingImage}" alt="预览" style="cursor:pointer;" onclick="removePendingImage()" title="点击移除图片">`;
   }
   if (pendingVideoFile) {
-    const vidUrl = URL.createObjectURL(pendingVideoFile);
+    var isAudio = pendingVideoFile.type.startsWith('audio/');
+    var iconSvg = isAudio
+      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>'
+      : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M22 8l-6 4 6 4V8z"/></svg>';
+    var label = isAudio ? '🎵 ' : '';
     html += `<div class="video-preview-tag">`
-      + `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M22 8l-6 4 6 4V8z"/></svg>`
-      + `<span class="video-name" title="${pendingVideoFile.name}">${pendingVideoFile.name}</span>`
-      + `<span class="video-del" onclick="removePendingVideo()" title="移除视频"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span>`
+      + iconSvg
+      + `<span class="video-name" title="${pendingVideoFile.name}">${label}${pendingVideoFile.name}</span>`
+      + `<span class="video-del" onclick="removePendingVideo()" title="移除"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span>`
       + `</div>`;
     // 缓存 objectURL 供后续释放（避免内存泄漏）
     if (window._pendingVideoObjUrl) URL.revokeObjectURL(window._pendingVideoObjUrl);
-    window._pendingVideoObjUrl = vidUrl;
+    window._pendingVideoObjUrl = isAudio ? null : URL.createObjectURL(pendingVideoFile);
   }
   area.innerHTML = html;
 }
