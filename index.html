@@ -683,7 +683,7 @@ html.light .guest-id.broadcasting { color: #222; }
             </label>
             <label class="img-upload-btn" title="上传视频/音频">
               <span id="ico-video"></span>
-              <input type="file" id="msg-video" accept="video/*,audio/*" hidden>
+              <input type="file" id="msg-video" accept="video/*,audio/*,.m4a,.mp3,.wav,.aac,.ogg" hidden>
             </label>
             <span class="voice-btn" id="voice-btn" title="录制语音"><span id="ico-mic"></span></span>
             <span class="walkie-btn" id="walkie-btn" title="对讲机（按住说话）"><span id="ico-walkie"></span></span>
@@ -1194,7 +1194,13 @@ async function uploadVideo(file, username) {
 // 上传语音到 Supabase Storage（共享文件名，任何账号上传都覆盖旧语音）
 async function uploadAudio(blob, username) {
   if (!supabaseClient) throw new Error('Supabase 未初始化');
-  const ext = (blob.type.includes('mp4') || blob.type.includes('m4a')) ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm';
+  const t = blob.type;
+  const ext = (t.includes('mp4') || t.includes('m4a')) ? 'm4a'
+    : t.includes('mpeg') ? 'mp3'
+    : t.includes('ogg') ? 'ogg'
+    : t.includes('wav') || t.includes('wave') ? 'wav'
+    : t.includes('aac') ? 'aac'
+    : 'webm';
   const fixedPath = `shared_voice.${ext}`;
 
   // 上传（upsert: true 直接覆盖）
