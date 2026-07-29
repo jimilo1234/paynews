@@ -1332,6 +1332,7 @@ async function doLogin() {
     // 初始化lastPlayedAudioMsgId：登录后只自动播放新到达的语音消息，不播放历史
     if (messages.length > 0) {
       lastPlayedAudioMsgId = Math.max(...messages.map(m => m.id));
+      _pollLastId = lastPlayedAudioMsgId;
     }
     document.getElementById('public-page').classList.remove('active');
     document.getElementById('member-page').classList.add('active');
@@ -1389,6 +1390,7 @@ function doLogout() {
   stopWalkieAudio();
   stopAutoPlayAudio();
   lastPlayedAudioMsgId = 0;
+  _pollLastId = 0;
   document.getElementById('member-page').classList.remove('active');
   document.getElementById('public-page').classList.add('active');
   document.getElementById('login-account').value = '';
@@ -2955,6 +2957,29 @@ if ('serviceWorker' in navigator) {
     console.log('[PWA] SW注册失败:', err);
   });
 }
+
+// 轮询兜底：每3秒查最新消息ID，broadcast丢了也能补通知
+let _pollLastId = 0;
+setInterval(async () => {
+  if (!supabaseClient || !currentUser) return;
+  try {
+    const { data } = await supabaseClient.from('messages').select('id,username,display_name,text,audio_url,image_url').order('id', { ascending: false }).limit(1);
+    if (!data || !data.length) return;
+    const latest = data[0];
+    if (latest.id > _pollLastId && latest.username !== currentUser.username) {
+      _pollLastId = latest.id;
+      const preview = latest.text || (latest.audio_url ? '[语音]' : latest.image_url ? '[图片]' : '新消息');
+      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'NEW_MESSAGE_NOTIFY',
+          title: latest.display_name || latest.username,
+          body: preview
+        });
+      }
+    }
+    if (latest.id > _pollLastId) _pollLastId = latest.id;
+  } catch(e) {}
+}, 3000);
 </script>
 
 </body>
