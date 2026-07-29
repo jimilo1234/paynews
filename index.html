@@ -583,6 +583,40 @@ html.light .guest-id.broadcasting { color: #222; }
   font-size: 14px;
 }
 
+/* Toast 自动消失提示 */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.toast {
+  background: #ff4d4f;
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: 0 4px 20px rgba(255,77,79,0.4);
+  animation: toastSlideIn 0.35s ease-out, toastSlideOut 0.35s ease-in 2.5s forwards;
+  text-align: center;
+  max-width: 90vw;
+  word-break: break-word;
+}
+@keyframes toastSlideIn {
+  from { opacity: 0; transform: translateY(-30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes toastSlideOut {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-20px); }
+}
+
   </style>
 </head>
 <body>
@@ -1365,6 +1399,24 @@ async function doLogin() {
     loginBtn.disabled = false;
     loginBtn.textContent = '发布新闻';
   }
+}
+
+// 自动消失的Toast提示
+function showToast(msg, duration = 3000) {
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    container.className = 'toast-container';
+    document.body.appendChild(container);
+  }
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  container.appendChild(el);
+  setTimeout(() => {
+    if (el.parentNode) el.parentNode.removeChild(el);
+  }, duration + 400); // 等动画结束再移除
 }
 
 function doLogout() {
@@ -2886,13 +2938,13 @@ function initAdminKickListener() {
   const ch = supabaseClient.channel('admin-commands', { config: { broadcast: { self: false } } });
   ch.on('broadcast', { event: 'kick' }, (data) => {
     if (currentUser && currentUser.username === data.payload.username) {
-      // 新设备登录踢下线（broadcast设置了self:false，不会踢到自己）
       if (data.payload.reason === 'new_login') {
-        alert('您的账号已在其他设备登录，当前设备已自动登出');
+        // 新设备登录踢下线：toast自动消失 + 立即登出
+        showToast('您的账号已在其他设备登录，当前设备已自动登出');
         doLogout();
       } else {
         // 管理员踢下线
-        alert('You have been kicked by admin');
+        showToast('你已被管理员踢下线');
         doLogout();
       }
     }
