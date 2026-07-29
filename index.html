@@ -1443,8 +1443,8 @@ async function doSendMessage() {
     // 发送留言
     await sendMessage(currentUser.username, currentUser.displayName, text, imageUrl, audioUrl, videoUrl);
 
-    // 通知其他客户端有新消息
-    notifyNewMessage();
+    // 通知其他客户端有新消息（携带摘要，接收端秒出通知）
+    notifyNewMessage(currentUser.username, currentUser.displayName, text, !!audioUrl, !!imageUrl);
 
     // 清空输入
     document.getElementById('msg-text').value = '';
@@ -1649,8 +1649,22 @@ function subscribeMessageChanges() {
   messagesNotifyChannel = supabaseClient.channel('messages-notify', {
     config: { broadcast: { self: false } }
   });
-  messagesNotifyChannel.on('broadcast', { event: 'new-message' }, async () => {
-    console.log('[实时消息] 收到新评论通知，立即刷新');
+  messagesNotifyChannel.on('broadcast', { event: 'new-message' }, async (msg) => {
+    const payload = msg?.payload || {};
+    console.log('[实时消息] 收到新评论通知，立即通知+刷新');
+    // 快路径：直接用broadcast payload出通知，不等数据库
+    if (payload.username && payload.username !== currentUser?.username) {
+      const displayName = payload.displayName || payload.username;
+      const preview = payload.text || (payload.hasAudio ? '[语音]' : payload.hasImage ? '[图片]' : '新消息');
+      // PWA通知
+      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'NEW_MESSAGE_NOTIFY',
+          title: displayName,
+          body: preview
+        });
+      }
+    }
     try {
       const messages = await fetchMessages();
       // 只关注来自其他用户的新消息（排除自己发的）
@@ -1678,17 +1692,6 @@ function subscribeMessageChanges() {
           if (msg.audio_url) autoPlayVoiceMessage(msg.audio_url);
         }
       }
-      // PWA通知：其他用户发新消息时触发系统通知
-      if (otherNewMsgs.length > 0 && navigator.serviceWorker && navigator.serviceWorker.controller) {
-        const lastMsg = otherNewMsgs[otherNewMsgs.length - 1];
-        const title = lastMsg.display_name || lastMsg.username;
-        const body = lastMsg.text || (lastMsg.audio_url ? '发来一条语音' : lastMsg.image_url ? '发来一张图片' : '发来一条新消息');
-        navigator.serviceWorker.controller.postMessage({
-          type: 'NEW_MESSAGE_NOTIFY',
-          title: title,
-          body: body
-        });
-      }
     } catch (err) {
       console.error('[实时消息] 刷新失败:', err);
     }
@@ -1697,10 +1700,10 @@ function subscribeMessageChanges() {
     console.log('[消息通知频道] 状态:', status);
   });
 }
-// 发送新消息后广播通知其他客户端
-function notifyNewMessage() {
+// 发送新消息后广播通知其他客户端（携带摘要，接收端无需等fetch即可出通知）
+function notifyNewMessage(username, displayName, text, hasAudio, hasImage) {
   if (messagesNotifyChannel) {
-    messagesNotifyChannel.send({ type: 'broadcast', event: 'new-message', payload: { ts: Date.now() } });
+    messagesNotifyChannel.send({ type: 'broadcast', event: 'new-message', payload: { ts: Date.now(), username, displayName, text, hasAudio, hasImage } });
   }
 }
 
