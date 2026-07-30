@@ -617,6 +617,93 @@ html.light .guest-id.broadcasting { color: #222; }
   to { opacity: 0; transform: translateY(-20px); }
 }
 
+/* 管理面板 Toggle 开关 */
+.admin-toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px;
+  background: var(--bg-input);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+.admin-toggle-row .toggle-label {
+  font-size: 15px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+.admin-toggle {
+  position: relative;
+  width: 52px;
+  height: 28px;
+  flex-shrink: 0;
+}
+.admin-toggle input { display: none; }
+.admin-toggle .slider {
+  position: absolute;
+  inset: 0;
+  background: var(--border);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background 0.25s;
+}
+.admin-toggle .slider::before {
+  content: '';
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 22px; height: 22px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.25s;
+}
+.admin-toggle input:checked + .slider { background: var(--accent); }
+.admin-toggle input:checked + .slider::before { transform: translateX(24px); }
+
+/* 在线论坛 - 贪吃蛇游戏 */
+#tab-forum {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.forum-game-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 500px;
+  aspect-ratio: 1;
+  background: var(--bg-input);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  touch-action: none;
+}
+.forum-game-wrapper canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.forum-status {
+  display: flex;
+  gap: 24px;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+.forum-status .p1 { color: #4ade80; }
+.forum-status .p2 { color: #60a5fa; }
+.forum-status .score { font-weight: 700; color: var(--text-primary); }
+.forum-waiting {
+  color: var(--text-dim);
+  font-size: 14px;
+  text-align: center;
+  padding: 40px 0;
+}
+.forum-tip {
+  font-size: 12px;
+  color: var(--text-dim);
+  text-align: center;
+  opacity: 0.7;
+}
+
   </style>
 </head>
 <body>
@@ -677,6 +764,7 @@ html.light .guest-id.broadcasting { color: #222; }
       <div class="tab-bar">
         <button class="tab-btn active" data-tab="tab-news">行业简报</button>
         <button class="tab-btn ai-only-tab" data-tab="tab-movie" style="display:none;">AI助手</button>
+        <button class="tab-btn forum-tab" data-tab="tab-forum" style="display:none;">在线论坛</button>
       </div>
       <!-- Tab 内容区 -->
       <div class="tab-panel active" id="tab-news">
@@ -695,6 +783,19 @@ html.light .guest-id.broadcasting { color: #222; }
         <div class="iframe-wrapper">
           <iframe id="ai-assistant-iframe" src="https://bailiangroup.aiforce.cloud/app/app_4kebg037d5txp" style="width:100%;border:none;border-radius:8px;background:var(--bg-dark);"></iframe>
         </div>
+      </div>
+
+      <!-- 在线论坛 tab：双人贪吃蛇 -->
+      <div class="tab-panel" id="tab-forum">
+        <div class="forum-game-wrapper" id="forum-game-wrapper">
+          <canvas id="forum-canvas"></canvas>
+        </div>
+        <div class="forum-status" id="forum-status">
+          <span class="p1">🟢 你：<span class="score" id="forum-score-self">0</span></span>
+          <span class="p2" id="forum-opponent-info" style="display:none;">🔵 对手：<span class="score" id="forum-score-opp">0</span></span>
+          <span id="forum-waiting-msg" class="forum-waiting">等待对手加入...</span>
+        </div>
+        <div class="forum-tip">📱 滑动屏幕操控方向 ｜ 💻 键盘方向键操控</div>
       </div>
 
     <!-- 悬浮评论按钮 -->
@@ -1380,6 +1481,12 @@ async function doLogin() {
     // 登录后重新初始化对讲机（用正确的用户名作为Presence key）
     initWalkieTalkie();
     initAdminKickListener();  // listen for admin kick commands
+    initForumToggleListener(); // listen for forum toggle
+    // 登录后检查论坛开关状态
+    if (localStorage.getItem(FORUM_KEY) === '1') {
+      forumEnabled = true;
+      applyForumState(true);
+    }
     // 订阅messages表实时变更，新消息立即刷新评论
     subscribeMessageChanges();
 
@@ -1460,6 +1567,8 @@ function doLogout() {
   // 退出时隐藏AI助手tab
   const aiTabLogout = document.querySelector('.ai-only-tab');
   if (aiTabLogout) aiTabLogout.style.display = 'none';
+  // 停止论坛贪吃蛇
+  stopSnakeGame();
   // 刷新公共页留言
   loadPublicMessages();
   // 回到登录页顶部
@@ -2259,8 +2368,15 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     const memberHeader = document.getElementById('member-newspaper-header');
     const inputArea = document.querySelector('.message-input-area');
     const isAITab = (targetId === 'tab-movie');
-    if (memberHeader) memberHeader.style.display = isAITab ? 'none' : '';
-    if (inputArea) inputArea.style.display = isAITab ? 'none' : '';
+    const isForumTab = (targetId === 'tab-forum');
+    if (memberHeader) memberHeader.style.display = (isAITab || isForumTab) ? 'none' : '';
+    if (inputArea) inputArea.style.display = (isAITab || isForumTab) ? 'none' : '';
+    // 处理论坛tab切换
+    if (isForumTab) {
+      onForumTabActivated();
+    } else {
+      onForumTabDeactivated();
+    }
     // AI助手tab：仅0110可用
     if (targetId === 'tab-movie' && (!currentUser || currentUser.username !== '0110')) {
       return;
@@ -2894,6 +3010,9 @@ function openAdminPanel() {
     });
     adminChannel.subscribe();
   }
+  
+  // 同步论坛开关状态到toggle
+  document.getElementById('admin-forum-toggle').checked = forumEnabled;
 }
 
 function exitAdminPanel() {
@@ -2952,6 +3071,398 @@ function initAdminKickListener() {
   ch.subscribe();
 }
 
+// ============ 在线论坛（双人贪吃蛇） ============
+const FORUM_KEY = 'paynews_forum_enabled';
+const SNAKE_CHANNEL = 'snake-forum';
+const GRID = 20;           // 20x20 网格
+const TICK_MS = 150;       // 游戏帧间隔
+const INIT_LEN = 4;        // 初始蛇长
+
+let forumEnabled = false;
+let forumChannel = null;
+let snakeGame = null;       // { intervalId, canvas, ctx, cellSize, ... }
+let snakeMyDir = 'right';
+let snakeMyNextDir = 'right';
+let snakeMyBody = [];
+let snakeOppBody = [];
+let snakeFood = null;
+let snakeMyScore = 0;
+let snakeOppScore = 0;
+let snakeIAmHost = false;
+let snakeOppName = '';
+let snakeGameRunning = false;
+let snakeTouchStart = null;
+
+// 管理面板开关 → broadcast 给所有客户端
+function toggleForum(on) {
+  forumEnabled = on;
+  localStorage.setItem(FORUM_KEY, on ? '1' : '0');
+  document.getElementById('admin-forum-toggle').checked = on;
+  // 通过 admin-commands 广播
+  if (adminChannel) {
+    adminChannel.send({ type: 'broadcast', event: 'toggle_forum', payload: { enabled: on } });
+  }
+  // 更新自己的 tab 显隐
+  applyForumState(on);
+}
+
+// 所有客户端监听 toggle 广播
+function initForumToggleListener() {
+  const ch = supabaseClient.channel('admin-commands', { config: { broadcast: { self: true } } });
+  ch.on('broadcast', { event: 'toggle_forum' }, (data) => {
+    const on = data.payload.enabled;
+    forumEnabled = on;
+    localStorage.setItem(FORUM_KEY, on ? '1' : '0');
+    applyForumState(on);
+    const toggleEl = document.getElementById('admin-forum-toggle');
+    if (toggleEl) toggleEl.checked = on;
+  });
+  ch.subscribe();
+}
+
+function applyForumState(on) {
+  const tab = document.querySelector('.forum-tab');
+  if (tab) tab.style.display = on ? '' : 'none';
+  // 如果 tab 关闭且当前在论坛页，切回行业简报
+  if (!on) {
+    const forumPanel = document.getElementById('tab-forum');
+    if (forumPanel && forumPanel.classList.contains('active')) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      const newsTab = document.querySelector('[data-tab="tab-news"]');
+      if (newsTab) newsTab.classList.add('active');
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      const newsPanel = document.getElementById('tab-news');
+      if (newsPanel) newsPanel.classList.add('active');
+    }
+    stopSnakeGame();
+  }
+}
+
+// ============ 贪吃蛇游戏引擎 ============
+
+function initSnakeGame() {
+  const wrapper = document.getElementById('forum-game-wrapper');
+  const canvas = document.getElementById('forum-canvas');
+  if (!wrapper || !canvas) return;
+  
+  const size = Math.min(wrapper.clientWidth, 500);
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const cellSize = size / GRID;
+  
+  snakeGame = { wrapper, canvas, ctx, cellSize };
+  
+  // 触屏滑动
+  canvas.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    snakeTouchStart = { x: t.clientX, y: t.clientY };
+  }, { passive: true });
+  canvas.addEventListener('touchend', e => {
+    if (!snakeTouchStart) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - snakeTouchStart.x;
+    const dy = t.clientY - snakeTouchStart.y;
+    snakeTouchStart = null;
+    const absDx = Math.abs(dx), absDy = Math.abs(dy);
+    if (Math.max(absDx, absDy) < 20) return; // 太小忽略
+    if (absDx > absDy) {
+      changeSnakeDir(dx > 0 ? 'right' : 'left');
+    } else {
+      changeSnakeDir(dy > 0 ? 'down' : 'up');
+    }
+  });
+  canvas.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+  
+  // 键盘
+  document.addEventListener('keydown', snakeKeyHandler);
+}
+
+function snakeKeyHandler(e) {
+  const keyMap = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
+  const dir = keyMap[e.key];
+  if (dir) { e.preventDefault(); changeSnakeDir(dir); }
+}
+
+function changeSnakeDir(dir) {
+  const opposites = { up: 'down', down: 'up', left: 'right', right: 'left' };
+  if (dir !== opposites[snakeMyDir]) {
+    snakeMyNextDir = dir;
+  }
+}
+
+function startSnakeGame() {
+  if (snakeGameRunning) return;
+  if (!snakeGame) initSnakeGame();
+  
+  // 初始化蛇
+  snakeMyBody = [];
+  const cx = Math.floor(GRID / 2);
+  for (let i = INIT_LEN - 1; i >= 0; i--) {
+    snakeMyBody.push({ x: cx - i - 4, y: cx });
+  }
+  snakeMyDir = 'right';
+  snakeMyNextDir = 'right';
+  snakeOppBody = [];
+  snakeMyScore = 0;
+  snakeOppScore = 0;
+  snakeFood = randomFood();
+  
+  document.getElementById('forum-score-self').textContent = '0';
+  document.getElementById('forum-score-opp').textContent = '0';
+  document.getElementById('forum-opponent-info').style.display = 'none';
+  document.getElementById('forum-waiting-msg').style.display = '';
+  
+  // 建立 Supabase channel
+  if (forumChannel) { try { supabaseClient.removeChannel(forumChannel); } catch(e) {} }
+  forumChannel = supabaseClient.channel(SNAKE_CHANNEL, { config: { broadcast: { self: true }, presence: { key: currentUser.username } } });
+  
+  forumChannel.on('broadcast', { event: 'join' }, (data) => {
+    if (data.payload.username === currentUser.username) return;
+    snakeOppName = data.payload.username;
+    document.getElementById('forum-opponent-info').style.display = '';
+    document.getElementById('forum-waiting-msg').style.display = 'none';
+    // 回复游戏状态给新加入者
+    if (snakeIAmHost) {
+      broadcastSnakeState();
+    }
+  });
+  
+  forumChannel.on('broadcast', { event: 'state' }, (data) => {
+    if (data.payload.username === currentUser.username) return;
+    const p = data.payload;
+    if (p.snake1 && p.snake2) {
+      // host 发来的完整状态
+      if (p.username === currentUser.username) {
+        // 这是 host 发回的我的蛇数据，可以用来纠正
+        // 暂时信任 host
+      } else {
+        snakeOppBody = (p.username === snakeOppName) ? p.snake1 : p.snake2;
+        // 确定哪个是自己的蛇
+        if (p.opponent === currentUser.username) {
+          snakeOppBody = p.snake1;
+        } else {
+          snakeOppBody = p.snake2;
+        }
+      }
+      snakeFood = p.food;
+      snakeMyScore = p.username === currentUser.username ? p.score1 : p.score2;
+      snakeOppScore = p.username === currentUser.username ? p.score2 : p.score1;
+      document.getElementById('forum-score-self').textContent = snakeMyScore;
+      document.getElementById('forum-score-opp').textContent = snakeOppScore;
+    }
+  });
+  
+  forumChannel.on('broadcast', { event: 'dir' }, (data) => {
+    if (data.payload.username === currentUser.username) return;
+    // opponent 的方向会体现在 host 的 state 里，这里可以忽略
+  });
+  
+  forumChannel.on('broadcast', { event: 'leave' }, (data) => {
+    if (data.payload.username === snakeOppName) {
+      snakeOppName = '';
+      snakeOppBody = [];
+      document.getElementById('forum-opponent-info').style.display = 'none';
+      document.getElementById('forum-waiting-msg').style.display = '';
+      document.getElementById('forum-score-opp').textContent = '0';
+      snakeOppScore = 0;
+    }
+  });
+  
+  forumChannel.subscribe(async (status) => {
+    if (status !== 'SUBSCRIBED') return;
+    
+    // 发送加入事件
+    await forumChannel.send({ type: 'broadcast', event: 'join', payload: { username: currentUser.username } });
+    
+    // 判断是否 host（先加入的）
+    // 简单策略：延迟200ms后如果没收到state就是host
+    setTimeout(() => {
+      if (!snakeOppName) {
+        snakeIAmHost = true;
+        snakeOppName = '';
+      }
+      snakeGameRunning = true;
+      snakeGame.intervalId = setInterval(snakeGameTick, TICK_MS);
+    }, 300);
+  });
+}
+
+function broadcastSnakeState() {
+  if (!forumChannel || !snakeGameRunning) return;
+  forumChannel.send({
+    type: 'broadcast',
+    event: 'state',
+    payload: {
+      username: currentUser.username,
+      opponent: snakeOppName,
+      snake1: snakeMyBody,
+      snake2: snakeOppBody,
+      food: snakeFood,
+      score1: snakeMyScore,
+      score2: snakeOppScore
+    }
+  }).catch(() => {});
+}
+
+function randomFood() {
+  let pos;
+  do {
+    pos = { x: Math.floor(Math.random() * GRID), y: Math.floor(Math.random() * GRID) };
+  } while (
+    snakeMyBody.some(s => s.x === pos.x && s.y === pos.y) ||
+    snakeOppBody.some(s => s.x === pos.x && s.y === pos.y)
+  );
+  return pos;
+}
+
+function snakeGameTick() {
+  if (!snakeGame || !snakeGameRunning) return;
+  
+  // 移动
+  snakeMyDir = snakeMyNextDir;
+  const head = snakeMyBody[snakeMyBody.length - 1];
+  let newHead;
+  switch (snakeMyDir) {
+    case 'up':    newHead = { x: head.x, y: head.y - 1 }; break;
+    case 'down':  newHead = { x: head.x, y: head.y + 1 }; break;
+    case 'left':  newHead = { x: head.x - 1, y: head.y }; break;
+    case 'right': newHead = { x: head.x + 1, y: head.y }; break;
+  }
+  
+  // 碰墙检测
+  if (newHead.x < 0 || newHead.x >= GRID || newHead.y < 0 || newHead.y >= GRID) {
+    snakeDie();
+    return;
+  }
+  // 碰自己
+  if (snakeMyBody.some(s => s.x === newHead.x && s.y === newHead.y)) {
+    snakeDie();
+    return;
+  }
+  // 碰对手
+  if (snakeOppBody.some(s => s.x === newHead.x && s.y === newHead.y)) {
+    snakeDie();
+    return;
+  }
+  
+  snakeMyBody.push(newHead);
+  
+  // 吃食物
+  let ate = false;
+  if (newHead.x === snakeFood.x && newHead.y === snakeFood.y) {
+    snakeMyScore++;
+    document.getElementById('forum-score-self').textContent = snakeMyScore;
+    snakeFood = randomFood();
+    ate = true;
+  }
+  
+  if (!ate) snakeMyBody.shift();
+  
+  // host 广播状态
+  if (snakeIAmHost) broadcastSnakeState();
+  
+  // 非 host 发送方向
+  if (!snakeIAmHost && snakeOppName) {
+    forumChannel.send({
+      type: 'broadcast',
+      event: 'dir',
+      payload: { username: currentUser.username, dir: snakeMyDir }
+    }).catch(() => {});
+  }
+  
+  renderSnake();
+}
+
+function snakeDie() {
+  stopSnakeGame();
+  // 短暂延迟后自动重开
+  setTimeout(() => {
+    if (document.getElementById('tab-forum').classList.contains('active') && currentUser) {
+      startSnakeGame();
+    }
+  }, 1500);
+}
+
+function stopSnakeGame() {
+  snakeGameRunning = false;
+  if (snakeGame && snakeGame.intervalId) {
+    clearInterval(snakeGame.intervalId);
+    snakeGame.intervalId = null;
+  }
+  if (forumChannel) {
+    forumChannel.send({ type: 'broadcast', event: 'leave', payload: { username: currentUser ? currentUser.username : '' } }).catch(() => {});
+    try { supabaseClient.removeChannel(forumChannel); } catch(e) {}
+    forumChannel = null;
+  }
+  snakeOppName = '';
+  snakeOppBody = [];
+}
+
+function renderSnake() {
+  const g = snakeGame;
+  if (!g) return;
+  const { ctx, cellSize } = g;
+  const w = cellSize * GRID;
+  
+  ctx.clearRect(0, 0, w, w);
+  
+  // 背景网格
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= GRID; i++) {
+    ctx.beginPath();
+    ctx.moveTo(i * cellSize, 0);
+    ctx.lineTo(i * cellSize, w);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, i * cellSize);
+    ctx.lineTo(w, i * cellSize);
+    ctx.stroke();
+  }
+  
+  // 食物
+  ctx.fillStyle = '#fbbf24';
+  ctx.beginPath();
+  ctx.arc(
+    snakeFood.x * cellSize + cellSize / 2,
+    snakeFood.y * cellSize + cellSize / 2,
+    cellSize / 2 - 2, 0, Math.PI * 2
+  );
+  ctx.fill();
+  
+  // 画蛇函数
+  const drawSnake = (body, color, headColor) => {
+    if (!body || body.length === 0) return;
+    body.forEach((seg, i) => {
+      ctx.fillStyle = i === body.length - 1 ? headColor : color;
+      const r = cellSize / 2 - 1;
+      const cx = seg.x * cellSize + cellSize / 2;
+      const cy = seg.y * cellSize + cellSize / 2;
+      ctx.beginPath();
+      ctx.roundRect(seg.x * cellSize + 1, seg.y * cellSize + 1, cellSize - 2, cellSize - 2, r);
+      ctx.fill();
+    });
+  };
+  
+  drawSnake(snakeMyBody, '#4ade80', '#22c55e');
+  drawSnake(snakeOppBody, '#60a5fa', '#3b82f6');
+}
+
+// 监听 forum tab 切换
+function onForumTabActivated() {
+  if (!snakeGameRunning && currentUser) {
+    initSnakeGame();
+    startSnakeGame();
+  }
+}
+
+function onForumTabDeactivated() {
+  stopSnakeGame();
+}
+
+// ============ 在线论坛 END ============
+
 document.getElementById('admin-password-input').addEventListener('keydown', function(e) {
   if (e.key === 'Enter') verifyAdminPassword();
 });
@@ -2988,6 +3499,13 @@ document.getElementById('admin-password-input').addEventListener('keydown', func
       <div style="max-width:600px;margin:40px auto">
         <h2 style="color:var(--text-primary);margin-bottom:24px;border-bottom:2px solid var(--border);padding-bottom:12px">🔧 管理面板</h2>
         <div style="font-size:15px;color:var(--text-dim);margin-bottom:20px">当前在线：<span id="admin-online-count" style="color:var(--text-primary);font-weight:600">0</span> 人</div>
+        <div class="admin-toggle-row">
+          <span class="toggle-label">🧩 在线论坛（双人贪吃蛇）</span>
+          <label class="admin-toggle">
+            <input type="checkbox" id="admin-forum-toggle" onchange="toggleForum(this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
         <ul id="admin-user-list" style="list-style:none;padding:0;margin:0">
           <li style="text-align:center;color:var(--text-dim);padding:40px 20px;font-size:14px">暂无在线用户</li>
         </ul>
