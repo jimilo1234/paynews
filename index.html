@@ -3055,8 +3055,8 @@ function kickUser(username) {
 function initAdminKickListener() {
   ensureAdminChannel();
   adminChannel.on('broadcast', { event: 'kick' }, (data) => {
-    // 不踢自己（self:true时自己也会收到广播）
-    if (data.payload.session_id === mySessionId) return;
+    // 如果指定了session_id，只有匹配的设备才响应（不是发给我的就跳过）
+    if (data.payload.session_id && data.payload.session_id !== mySessionId) return;
     if (currentUser && currentUser.username === data.payload.username) {
       if (data.payload.reason === 'new_login') {
         showToast('您的账号已在其他设备登录，当前设备已自动登出');
