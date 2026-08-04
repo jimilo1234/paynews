@@ -2553,62 +2553,53 @@ async function gkCleanup() {
   await supabaseClient.from('gomoku_games').delete().eq('status','waiting').lt('created_at', tenMinAgo);
 }
 
-// 清理Storage中的图片和语音文件，同时置空messages中的媒体链接
-// 注意：语音文件由本函数管理生命周期，不置空audio_url（避免播放器消失）
+// 清理Storage中的媒体文件（固定文件名覆盖机制）+ 置空messages中的媒体链接
+// 注意：由于没有 DELETE 策略，文件通过新上传覆盖旧文件来"清理"
 async function cleanupStorage() {
   if (!supabaseClient) return;
   try {
-    // 列出media bucket中的所有文件
-    const { data: files, error } = await supabaseClient.storage.from('media').list('', { limit: 100 });
-    if (error) { console.warn('列出存储文件失败:', error); return; }
-    if (files && files.length > 0) {
-      // 分离图片、视频和语音文件
-      const imageFiles = files.filter(f => f.name.startsWith('shared_image'));
-      const voiceFiles = files.filter(f => f.name.startsWith('shared_voice'));
-      const videoFiles = files.filter(f => f.name.startsWith('shared_video'));
+    // 图片、视频、语音都使用固定文件名，新内容会自动覆盖旧内容
+    // 这里只需清理 messages 表中的过期记录
 
-      // 图片文件：立即删除（与图片生命周期一致）
-      if (imageFiles.length > 0) {
-        const imagePaths = imageFiles.map(f => f.name);
-        const { error: delErr } = await supabaseClient.storage.from('media').remove(imagePaths);
-        if (delErr) console.warn('删除图片文件失败:', delErr);
-        else console.log(`已清理 ${imagePaths.length} 个图片文件`);
-      }
-
-      const thirtyMinAgo = Date.now() - 30 * 60 * 1000;
-
-      // 视频文件：只删除超过30分钟的旧视频
-      const oldVideoFiles = videoFiles.filter(f => new Date(f.created_at).getTime() < thirtyMinAgo);
-      if (oldVideoFiles.length > 0) {
-        const videoPaths = oldVideoFiles.map(f => f.name);
-        await supabaseClient.storage.from('media').remove(videoPaths);
-        // 旧视频删除后，置空对应的video_url
-        const { error: msgErr } = await supabaseClient
-          .from('messages')
-          .update({ video_url: null })
-          .not('video_url', 'is', null);
-        if (msgErr) console.warn('清理视频链接失败:', msgErr);
-      }
-
-      // 语音文件：只删除超过30分钟的旧语音
-      const oldVoiceFiles = voiceFiles.filter(f => new Date(f.created_at).getTime() < thirtyMinAgo);
-      if (oldVoiceFiles.length > 0) {
-        const voicePaths = oldVoiceFiles.map(f => f.name);
-        await supabaseClient.storage.from('media').remove(voicePaths);
-        // 旧语音删除后，置空对应的audio_url
-        const { error: msgErr } = await supabaseClient
-          .from('messages')
-          .update({ audio_url: null })
-          .not('audio_url', 'is', null);
-        if (msgErr) console.warn('清理语音链接失败:', msgErr);
-      }
-    }
-    // 三类媒体均已统一30分钟清理策略，此处仅兜底置空image_url
-    const { error: msgErr } = await supabaseClient
+    // 清理图片链接（图片生命周期与消息一致，立即清理）
+    const { error: imgErr } = await supabaseClient
       .from('messages')
       .update({ image_url: null })
       .not('image_url', 'is', null);
-    if (msgErr) console.warn('清理消息图片链接失败:', msgErr);
+    if (imgErr) console.warn('清理图片链接失败:', imgErr);
+
+    // 清理视频链接（视频30分钟后过期）
+    const thirtyMinAgo = Date.now() - 30 * 60 * 1000;
+    const { data: oldVideos } = await supabaseClient
+      .from('messages')
+      .select('id, created_at')
+      .not('video_url', 'is', null)
+      .lt('created_at', new Date(thirtyMinAgo).toISOString());
+
+    if (oldVideos && oldVideos.length > 0) {
+      const { error: vidErr } = await supabaseClient
+        .from('messages')
+        .update({ video_url: null })
+        .in('id', oldVideos.map(v => v.id));
+      if (vidErr) console.warn('清理视频链接失败:', vidErr);
+    }
+
+    // 清理语音链接（语音30分钟后过期）
+    const { data: oldVoices } = await supabaseClient
+      .from('messages')
+      .select('id, created_at')
+      .not('audio_url', 'is', null)
+      .lt('created_at', new Date(thirtyMinAgo).toISOString());
+
+    if (oldVoices && oldVoices.length > 0) {
+      const { error: audErr } = await supabaseClient
+        .from('messages')
+        .update({ audio_url: null })
+        .in('id', oldVoices.map(v => v.id));
+      if (audErr) console.warn('清理语音链接失败:', audErr);
+    }
+
+    console.log('[清理] 媒体链接清理完成');
   } catch (e) {
     console.warn('Storage清理异常:', e);
   }
