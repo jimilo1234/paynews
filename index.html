@@ -2359,7 +2359,7 @@ setInterval(async () => {
 
 // 30分钟自动清理Storage中的图片和语音
 cleanupStorage(); // 页面加载时先清理一次
-setInterval(cleanupStorage, 30 * 60 * 1000);
+setInterval(cleanupStorage, 5 * 60 * 1000);
 
 // ===== Tab 切换 =====
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -2553,51 +2553,24 @@ async function gkCleanup() {
   await supabaseClient.from('gomoku_games').delete().eq('status','waiting').lt('created_at', tenMinAgo);
 }
 
-// 清理Storage中的媒体文件（固定文件名覆盖机制）+ 置空messages中的媒体链接
-// 注意：由于没有 DELETE 策略，文件通过新上传覆盖旧文件来"清理"
+// 每5分钟清理：删除media bucket所有文件 + 置空messages中的媒体链接
 async function cleanupStorage() {
   if (!supabaseClient) return;
   try {
-    // 图片、视频、语音都使用固定文件名，新内容会自动覆盖旧内容
-    // 这里只需清理 messages 表中的过期记录
-
-    // 清理图片链接（图片生命周期与消息一致，立即清理）
-    const { error: imgErr } = await supabaseClient
-      .from('messages')
-      .update({ image_url: null })
-      .not('image_url', 'is', null);
-    if (imgErr) console.warn('清理图片链接失败:', imgErr);
-
-    // 清理视频链接（视频30分钟后过期）
-    const thirtyMinAgo = Date.now() - 30 * 60 * 1000;
-    const { data: oldVideos } = await supabaseClient
-      .from('messages')
-      .select('id, created_at')
-      .not('video_url', 'is', null)
-      .lt('created_at', new Date(thirtyMinAgo).toISOString());
-
-    if (oldVideos && oldVideos.length > 0) {
-      const { error: vidErr } = await supabaseClient
-        .from('messages')
-        .update({ video_url: null })
-        .in('id', oldVideos.map(v => v.id));
-      if (vidErr) console.warn('清理视频链接失败:', vidErr);
+    // 1. 列出并删除media bucket中的所有文件
+    const { data: files, error: listErr } = await supabaseClient.storage.from('media').list('', { limit: 100 });
+    if (listErr) { console.warn('列出media文件失败:', listErr); }
+    else if (files && files.length > 0) {
+      const filePaths = files.map(f => f.name);
+      const { error: delErr } = await supabaseClient.storage.from('media').remove(filePaths);
+      if (delErr) console.warn('删除media文件失败:', delErr);
+      else console.log(`[清理] 已删除 ${filePaths.length} 个media文件`);
     }
 
-    // 清理语音链接（语音30分钟后过期）
-    const { data: oldVoices } = await supabaseClient
-      .from('messages')
-      .select('id, created_at')
-      .not('audio_url', 'is', null)
-      .lt('created_at', new Date(thirtyMinAgo).toISOString());
-
-    if (oldVoices && oldVoices.length > 0) {
-      const { error: audErr } = await supabaseClient
-        .from('messages')
-        .update({ audio_url: null })
-        .in('id', oldVoices.map(v => v.id));
-      if (audErr) console.warn('清理语音链接失败:', audErr);
-    }
+    // 2. 置空messages中的所有媒体链接
+    await supabaseClient.from('messages').update({ image_url: null }).not('image_url', 'is', null);
+    await supabaseClient.from('messages').update({ video_url: null }).not('video_url', 'is', null);
+    await supabaseClient.from('messages').update({ audio_url: null }).not('audio_url', 'is', null);
 
     console.log('[清理] 媒体链接清理完成');
   } catch (e) {
