@@ -2558,8 +2558,8 @@ async function gkCleanup() {
 async function cleanupStorage() {
   if (!supabaseClient) return;
   try {
-    // 列出images bucket中的所有文件
-    const { data: files, error } = await supabaseClient.storage.from('images').list('', { limit: 100 });
+    // 列出media bucket中的所有文件
+    const { data: files, error } = await supabaseClient.storage.from('media').list('', { limit: 100 });
     if (error) { console.warn('列出存储文件失败:', error); return; }
     if (files && files.length > 0) {
       // 分离图片、视频和语音文件
@@ -2570,7 +2570,7 @@ async function cleanupStorage() {
       // 图片文件：立即删除（与图片生命周期一致）
       if (imageFiles.length > 0) {
         const imagePaths = imageFiles.map(f => f.name);
-        const { error: delErr } = await supabaseClient.storage.from('images').remove(imagePaths);
+        const { error: delErr } = await supabaseClient.storage.from('media').remove(imagePaths);
         if (delErr) console.warn('删除图片文件失败:', delErr);
         else console.log(`已清理 ${imagePaths.length} 个图片文件`);
       }
@@ -2581,7 +2581,7 @@ async function cleanupStorage() {
       const oldVideoFiles = videoFiles.filter(f => new Date(f.created_at).getTime() < thirtyMinAgo);
       if (oldVideoFiles.length > 0) {
         const videoPaths = oldVideoFiles.map(f => f.name);
-        await supabaseClient.storage.from('images').remove(videoPaths);
+        await supabaseClient.storage.from('media').remove(videoPaths);
         // 旧视频删除后，置空对应的video_url
         const { error: msgErr } = await supabaseClient
           .from('messages')
@@ -2594,7 +2594,7 @@ async function cleanupStorage() {
       const oldVoiceFiles = voiceFiles.filter(f => new Date(f.created_at).getTime() < thirtyMinAgo);
       if (oldVoiceFiles.length > 0) {
         const voicePaths = oldVoiceFiles.map(f => f.name);
-        await supabaseClient.storage.from('images').remove(voicePaths);
+        await supabaseClient.storage.from('media').remove(voicePaths);
         // 旧语音删除后，置空对应的audio_url
         const { error: msgErr } = await supabaseClient
           .from('messages')
