@@ -1282,47 +1282,53 @@ async function sendMessage(username, displayName, text, imageUrl, audioUrl, vide
   }
 }
 
-// 上传图片到 Supabase Storage（共享文件名，任何账号上传都覆盖旧图）
+// 上传图片到私有 Storage（签名URL 7天有效，共享文件名覆盖旧图）
 async function uploadImage(file, username) {
   if (!supabaseClient) throw new Error('Supabase 未初始化');
   const ext = file.name.split('.').pop().toLowerCase();
   const fixedPath = `shared_image.${ext}`;
 
-  // 上传新图（upsert: true 直接覆盖，避免先删后传的竞态）
   const { data, error } = await supabaseClient.storage
-    .from('images')
+    .from('media')
     .upload(fixedPath, file, { contentType: file.type, upsert: true });
   if (error) {
     console.error('[上传图片] 失败:', error);
     throw new Error('图片上传失败: ' + error.message);
   }
-  const { data: urlData } = supabaseClient.storage
-    .from('images')
-    .getPublicUrl(fixedPath);
-  return urlData.publicUrl + '?t=' + Date.now();
+  const { data: urlData, error: urlErr } = await supabaseClient.storage
+    .from('media')
+    .createSignedUrl(fixedPath, 604800); // 7天有效
+  if (urlErr) {
+    console.error('[签名URL] 失败:', urlErr);
+    throw new Error('生成签名链接失败');
+  }
+  return urlData.signedUrl;
 }
 
-// 上传视频到 Supabase Storage（共享文件名，任何账号上传都覆盖旧视频）
+// 上传视频到私有 Storage（签名URL 7天有效，共享文件名覆盖旧视频）
 async function uploadVideo(file, username) {
   if (!supabaseClient) throw new Error('Supabase 未初始化');
   const ext = file.name.split('.').pop().toLowerCase();
   const fixedPath = `shared_video.${ext || 'mp4'}`;
 
-  // 上传新视频（upsert: true 直接覆盖）
   const { data, error } = await supabaseClient.storage
-    .from('images')
+    .from('media')
     .upload(fixedPath, file, { contentType: file.type || 'video/mp4', upsert: true });
   if (error) {
     console.error('[上传视频] 失败:', error);
     throw new Error('视频上传失败: ' + error.message);
   }
-  const { data: urlData } = supabaseClient.storage
-    .from('images')
-    .getPublicUrl(fixedPath);
-  return urlData.publicUrl + '?t=' + Date.now();
+  const { data: urlData, error: urlErr } = await supabaseClient.storage
+    .from('media')
+    .createSignedUrl(fixedPath, 604800); // 7天有效
+  if (urlErr) {
+    console.error('[签名URL] 失败:', urlErr);
+    throw new Error('生成签名链接失败');
+  }
+  return urlData.signedUrl;
 }
 
-// 上传语音到 Supabase Storage（共享文件名，任何账号上传都覆盖旧语音）
+// 上传语音到私有 Storage（签名URL 7天有效，共享文件名覆盖旧语音）
 async function uploadAudio(blob, username) {
   if (!supabaseClient) throw new Error('Supabase 未初始化');
   const t = blob.type;
@@ -1334,19 +1340,22 @@ async function uploadAudio(blob, username) {
     : 'webm';
   const fixedPath = `shared_voice.${ext}`;
 
-  // 上传（upsert: true 直接覆盖）
   const { data, error } = await supabaseClient.storage
-    .from('images')
+    .from('media')
     .upload(fixedPath, blob, { contentType: blob.type || 'audio/webm', upsert: true });
   if (error) {
     console.error('[上传语音] 失败:', error);
     throw new Error('语音上传失败: ' + error.message);
   }
 
-  const { data: urlData } = supabaseClient.storage
-    .from('images')
-    .getPublicUrl(fixedPath);
-  return urlData.publicUrl + '?t=' + Date.now();
+  const { data: urlData, error: urlErr } = await supabaseClient.storage
+    .from('media')
+    .createSignedUrl(fixedPath, 604800); // 7天有效
+  if (urlErr) {
+    console.error('[签名URL] 失败:', urlErr);
+    throw new Error('生成签名链接失败');
+  }
+  return urlData.signedUrl;
 }
 
 // ===== 页面逻辑 =====
