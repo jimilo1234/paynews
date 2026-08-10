@@ -2553,7 +2553,7 @@ async function gkCleanup() {
   await supabaseClient.from('gomoku_games').delete().eq('status','waiting').lt('created_at', tenMinAgo);
 }
 
-// 每5分钟清理：删除media bucket所有文件 + 置空messages中的媒体链接
+// 每10分钟清理：删除media bucket所有文件 + 置空messages中的媒体链接
 async function cleanupStorage() {
   if (!supabaseClient) return;
   try {
