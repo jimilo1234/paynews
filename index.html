@@ -2357,13 +2357,14 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     // 论坛tab：隐藏header和评论输入区
     const memberHeader = document.getElementById('member-newspaper-header');
     const inputArea = document.querySelector('.message-input-area');
-    const isForumTab = (targetId === 'tab-forum' || targetId === 'tab-pet');
+    const isForumTab = (targetId === 'tab-forum');
+    const isPetTab = (targetId === 'tab-pet');
     if (memberHeader) memberHeader.style.display = isForumTab ? 'none' : '';
     if (inputArea) inputArea.style.display = isForumTab ? 'none' : '';
     // 处理论坛tab切换
     if (isForumTab) {
       onForumTabActivated();
-    } else {
+    } else if (!isPetTab) {
       onForumTabDeactivated();
     }
   });
@@ -3457,8 +3458,8 @@ function render(){
   for(var r=0;r<ROWS;r++){
     for(var c=0;c<COLS;c++){
       var v=gc(g,r,c);
-      var col=PAL[v]||v;
-      if(col&&col.length>0){
+      var col=PAL[v];
+      if(col){
         ctx.fillStyle=col;
         ctx.fillRect(c*PX,r*PX,PX,PX);
       }
@@ -3610,6 +3611,13 @@ async function initPetSystem(){
 }
 
 // tab 切换联动
+// 页面加载后自动初始化，确保猫和按钮一定渲染出来（不依赖点击tab）
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',function(){if(!petInited)initPetSystem();});
+}else{
+  if(!petInited)initPetSystem();
+}
+
 var petTabBtn=document.querySelector('[data-tab="tab-pet"]');
 if(petTabBtn){
   petTabBtn.addEventListener('click',function(){
