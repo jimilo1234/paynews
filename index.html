@@ -663,7 +663,8 @@ html.light .guest-id.broadcasting { color: #222; }
 
 /* ===== 宠物练习 ===== */
 .pet-container{text-align:center;padding:16px 0}
-#pet-canvas{border-radius:12px;background:#FAFAFA;margin:0 auto 12px;display:block;max-width:100%}
+#pet-grid{border-radius:12px;background:#FAFAFA;margin:0 auto 12px;display:grid;grid-template-columns:repeat(20,14px);grid-template-rows:repeat(27,14px);gap:0;max-width:100%}
+#pet-grid .px{width:14px;height:14px}
 .pet-status-text{font-size:15px;color:#333;margin-bottom:12px;min-height:22px}
 .pet-section{margin-bottom:14px}
 .pet-section-title{font-size:12px;color:#999;margin-bottom:6px;text-align:left}
@@ -761,7 +762,7 @@ html.light .guest-id.broadcasting { color: #222; }
       <!-- 宠物练习 tab -->
       <div class="tab-panel" id="tab-pet">
         <div class="pet-container">
-          <canvas id="pet-canvas" width="280" height="378"></canvas>
+          <div id="pet-grid" class="pet-grid"></div>
           <div class="pet-status-text" id="pet-status-text">小猫正在发呆...</div>
           <div class="pet-section">
             <div class="pet-section-title">🐾 状态</div>
@@ -3435,10 +3436,10 @@ var MOOD_META=[
 function gc(g,r,c){return(r>=0&&r<g.length&&c>=0&&c<g[r].length)?g[r][c]:'0'}
 
 function render(){
-  var cv=document.getElementById('pet-canvas');
-  if(!cv)return;
-  var ctx=cv.getContext('2d');
-  ctx.clearRect(0,0,cv.width,cv.height);
+  var grid=document.getElementById('pet-grid');
+  if(!grid)return;
+  grid.innerHTML='';
+  
   var g=CAT.map(function(r){return r.split('')});
 
   // 眼睛
@@ -3454,19 +3455,24 @@ function render(){
   var pr=PROPS[petCur.sr];
   if(pr){pr.set.forEach(function(p){if(g[p[1]])g[p[1]][p[0]]=p[2]})}
 
-  // 绘制
+  // 渲染为div
   for(var r=0;r<ROWS;r++){
     for(var c=0;c<COLS;c++){
       var v=gc(g,r,c);
       var col=PAL[v];
+      var cell=document.createElement('div');
+      cell.className='px';
       if(col){
-        ctx.fillStyle=col;
-        ctx.fillRect(c*PX,r*PX,PX,PX);
+        cell.style.backgroundColor=col;
       }
+      grid.appendChild(cell);
     }
   }
-  document.getElementById('pet-status-text').textContent=
-    '小猫正在'+petCur.mn+'…（'+petCur.sn+'中）';
+  
+  var statusText=document.getElementById('pet-status-text');
+  if(statusText){
+    statusText.textContent='小猫正在'+petCur.mn+'…（'+petCur.sn+'中）';
+  }
 }
 
 function petRenderBtns(){
