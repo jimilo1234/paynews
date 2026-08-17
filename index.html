@@ -3596,6 +3596,7 @@ function petRealtime(){
 }
 
 async function initPetSystem(){
+  console.log('[Pet] initPetSystem 调用，petInited='+petInited);
   if(petInited)return;
   petInited=true;
   // 先渲染猫和按钮，不依赖Supabase
@@ -3611,11 +3612,10 @@ async function initPetSystem(){
 }
 
 // tab 切换联动
-// 页面加载后自动初始化，确保猫和按钮一定渲染出来（不依赖点击tab）
-if(document.readyState==='loading'){
-  document.addEventListener('DOMContentLoaded',function(){if(!petInited)initPetSystem();});
-}else{
-  if(!petInited)initPetSystem();
+// 直接初始化，不依赖 DOMContentLoaded（避免缓存或时序问题）
+if(!petInited){
+  console.log('[Pet] 初始化宠物系统...');
+  initPetSystem();
 }
 
 var petTabBtn=document.querySelector('[data-tab="tab-pet"]');
