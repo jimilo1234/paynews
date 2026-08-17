@@ -3525,6 +3525,7 @@ function petUpdateRefSelect(){
 }
 
 async function petLoad(){
+  if(!supabaseClient)return;
   try{
     var st=await supabaseClient.from('pet_state').select('*').eq('id',1).maybeSingle();
     if(st.data){
@@ -3548,6 +3549,7 @@ async function petChange(type,ref,name){
   else{petCur.mr=ref;petCur.mn=name}
   render();petRenderBtns();
   try{
+    if(!supabaseClient)return;
     var u={};
     if(type==='status'){u.status_ref=ref;u.status_name=name}
     else{u.mood_ref=ref;u.mood_name=name}
@@ -3560,6 +3562,7 @@ async function petChange(type,ref,name){
 
 async function petDel(id){
   try{
+    if(!supabaseClient)return;
     await supabaseClient.from('pet_custom').delete().eq('id',id);
     await petLoad();
   }catch(e){console.error('petDel:',e)}
@@ -3571,6 +3574,7 @@ window.petAddCustom=async function(){
   var ref=document.getElementById('pet-custom-ref').value;
   if(!name){alert('请输入名称');return}
   try{
+    if(!supabaseClient){alert('数据服务未就绪');return}
     await supabaseClient.from('pet_custom').insert({type:type,name:name,ref:ref});
     document.getElementById('pet-custom-name').value='';
     await petLoad();
@@ -3592,11 +3596,17 @@ function petRealtime(){
 
 async function initPetSystem(){
   if(petInited)return;
-  if(!supabaseClient)return;
   petInited=true;
-  await petLoad();
-  petRealtime();
+  // 先渲染猫和按钮，不依赖Supabase
+  petRenderBtns();
+  petUpdateRefSelect();
+  render();
   document.getElementById('pet-custom-type').addEventListener('change',petUpdateRefSelect);
+  // Supabase数据加载（失败不影响显示）
+  if(supabaseClient){
+    await petLoad();
+    petRealtime();
+  }
 }
 
 // tab 切换联动
