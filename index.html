@@ -660,6 +660,23 @@ html.light .guest-id.broadcasting { color: #222; }
   opacity: 0.7;
 }
 
+
+/* ===== 宠物练习 ===== */
+.pet-container{text-align:center;padding:16px 0}
+#pet-canvas{border-radius:12px;background:#FAFAFA;margin:0 auto 12px;display:block;max-width:100%}
+.pet-status-text{font-size:15px;color:#333;margin-bottom:12px;min-height:22px}
+.pet-section{margin-bottom:14px}
+.pet-section-title{font-size:12px;color:#999;margin-bottom:6px;text-align:left}
+.pet-btn-row{display:flex;flex-wrap:wrap;gap:6px}
+.pet-btn{padding:5px 11px;border:1.5px solid #E0E0E0;border-radius:16px;background:#fff;font-size:13px;cursor:pointer;transition:all .15s;white-space:nowrap}
+.pet-btn.active{border-color:#F5A623;background:#FFF8EE;color:#F5A623;font-weight:600}
+.pet-btn:active{transform:scale(.95)}
+.pet-del-btn{margin-left:-2px;padding:5px 4px 5px 0;border:none;background:none;color:#ccc;font-size:11px;cursor:pointer}
+.pet-del-btn:hover{color:#ff6b6b}
+.pet-custom-add{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center}
+.pet-custom-add select,.pet-custom-add input{padding:5px 8px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;outline:none}
+.pet-custom-add input{flex:1;min-width:80px}
+.pet-hint{font-size:11px;color:#ccc;text-align:center;margin-top:14px}
   </style>
 </head>
 <body>
@@ -720,6 +737,7 @@ html.light .guest-id.broadcasting { color: #222; }
       <div class="tab-bar">
         <button class="tab-btn active" data-tab="tab-news">行业简报</button>
         <button class="tab-btn forum-tab" data-tab="tab-forum" style="display:none;">在线论坛</button>
+        <button class="tab-btn pet-tab" data-tab="tab-pet">宠物练习</button>
       </div>
       <!-- Tab 内容区 -->
       <div class="tab-panel active" id="tab-news">
@@ -738,6 +756,35 @@ html.light .guest-id.broadcasting { color: #222; }
           <span id="forum-waiting-msg" class="forum-waiting">等待对手加入...</span>
         </div>
         <div class="forum-tip">📱 滑动屏幕操控方向 ｜ 💻 键盘方向键操控</div>
+      </div>
+
+      <!-- 宠物练习 tab -->
+      <div class="tab-panel" id="tab-pet">
+        <div class="pet-container">
+          <canvas id="pet-canvas" width="280" height="378"></canvas>
+          <div class="pet-status-text" id="pet-status-text">小猫正在发呆...</div>
+          <div class="pet-section">
+            <div class="pet-section-title">🐾 状态</div>
+            <div class="pet-btn-row" id="pet-status-btns"></div>
+          </div>
+          <div class="pet-section">
+            <div class="pet-section-title">💖 心情</div>
+            <div class="pet-btn-row" id="pet-mood-btns"></div>
+          </div>
+          <div class="pet-section">
+            <div class="pet-section-title">✨ 自定义</div>
+            <div class="pet-custom-add">
+              <select id="pet-custom-type">
+                <option value="status">状态</option>
+                <option value="mood">心情</option>
+              </select>
+              <input id="pet-custom-name" placeholder="名称" maxlength="8" />
+              <select id="pet-custom-ref"></select>
+              <button class="pet-btn" onclick="petAddCustom()">添加</button>
+            </div>
+          </div>
+          <div class="pet-hint">🐱 全站共养一只猫，实时同步</div>
+        </div>
       </div>
 
     <!-- 悬浮评论按钮 -->
@@ -2310,7 +2357,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     // 论坛tab：隐藏header和评论输入区
     const memberHeader = document.getElementById('member-newspaper-header');
     const inputArea = document.querySelector('.message-input-area');
-    const isForumTab = (targetId === 'tab-forum');
+    const isForumTab = (targetId === 'tab-forum' || targetId === 'tab-pet');
     if (memberHeader) memberHeader.style.display = isForumTab ? 'none' : '';
     if (inputArea) inputArea.style.display = isForumTab ? 'none' : '';
     // 处理论坛tab切换
@@ -3298,6 +3345,328 @@ function onForumTabDeactivated() {
 document.getElementById('admin-password-input').addEventListener('keydown', function(e) {
   if (e.key === 'Enter') verifyAdminPassword();
 });
+
+
+// ============ 宠物练习 START ============
+(function(){
+'use strict';
+
+var PX=14,COLS=20,ROWS=27;
+var petCur={sr:'work',sn:'工作',mr:'calm',mn:'发呆'};
+var petCust={s:[],m:[]};
+var petInited=false,petChan=null;
+
+// -- 基础猫 20x27 --
+var CAT=[
+'00011000000000001100',
+'00133100000000013310',
+'01P3331000000133P100',
+'01333331111133331000',
+'01333333333333331000',
+'01323333333333321000',
+'13333333333333333100',
+'13333333333333333100',
+'133B3333333333B33100',
+'133BB333333333BB3100',
+'133333333N3333333100',
+'01333333333333331000',
+'0133333B33B333331000',
+'01333333333333331000',
+'00133333333333310000',
+'00011333333331100000',
+'00001333333331000000',
+'00001333333331000000',
+'00001333333331000000',
+'00013333333333100000',
+'00133333333333310000',
+'01333333333333331000',
+'01333333333333331000',
+'00113300000011310000',
+'00133100000001331000',
+'001BB100000001BB1000',
+'00111000000000111000'
+];
+
+// -- 眼睛覆盖 --
+var EYES={
+calm:[],
+happy:{c:[[4,8],[5,8],[6,8],[13,8],[14,8],[15,8]],a:[[4,9],[6,9],[13,9],[15,9]]},
+sad:{c:[[4,8],[5,8],[14,8],[15,8]],a:[[4,9],[5,9],[14,9],[15,9]],
+  extra:{set:[['6',8,'#7EC8E8'],['6',9,'#7EC8E8']],clear:[]}},
+angry:{c:[[4,8],[5,8],[14,8],[15,8]],a:[[4,9],[6,9],[13,9],[15,9]],
+  extra:{set:[['3',7,'#E74C3C'],['16',7,'#E74C3C']],clear:[]}},
+sleepy:{c:[[4,9],[5,9],[6,9],[13,9],[14,9],[15,9]],a:[]},
+hungry:{c:[[4,8],[5,8],[6,8],[13,8],[14,8],[15,8]],a:[],
+  extra:{set:[['5',9,'#F1C40F'],['14',9,'#F1C40F']],clear:[]}},
+surprised:{c:[[4,8],[13,8]],a:[[4,9],[6,9],[13,9],[15,9]],
+  extra:{set:[['5',8,'#3D2817'],['14',8,'#3D2817'],['4',10,'#3D2817'],['13',10,'#3D2817']],clear:[]}},
+shy:{c:[[4,8],[5,8],[6,8],[13,8],[14,8],[15,8]],a:[],
+  extra:{set:[['3',10,'#FFB6C1'],['16',10,'#FFB6C1']],clear:[]}},
+miss:{c:[[4,8],[5,8],[6,8],[13,8],[14,8],[15,8]],a:[[4,9],[6,9],[13,9],[15,9]],
+  extra:{set:[['9',7,'#FF6B81'],['10',6,'#FF6B81'],['11',7,'#FF6B81'],['10',8,'#FF6B81']],clear:[]}},
+daze:{c:[[5,9],[14,9]],a:[]}
+};
+
+// -- 状态道具 --
+var PROPS={
+bath:{set:[
+  [1,19,'#7EC8E8'],[3,19,'#7EC8E8'],[5,19,'#7EC8E8'],[7,19,'#7EC8E8'],
+  [9,19,'#7EC8E8'],[11,19,'#7EC8E8'],[13,19,'#7EC8E8'],[15,19,'#7EC8E8'],[17,19,'#7EC8E8'],
+  [2,18,'#B8E6FF'],[8,18,'#B8E6FF'],[14,18,'#B8E6FF'],
+  [4,17,'#D6F0FF'],[12,17,'#D6F0FF'],
+  [1,20,'#B0B0B0'],[3,20,'#A0A0A0'],[5,20,'#B0B0B0'],[7,20,'#A0A0A0'],
+  [9,20,'#B0B0B0'],[11,20,'#A0A0A0'],[13,20,'#B0B0B0'],[15,20,'#A0A0A0'],[17,20,'#B0B0B0']
+]},
+eat:{set:[
+  [6,24,'#D4A574'],[7,24,'#D4A574'],[8,24,'#D4A574'],[9,24,'#D4A574'],
+  [10,24,'#D4A574'],[11,24,'#D4A574'],[12,24,'#D4A574'],[13,24,'#D4A574'],
+  [7,23,'#FFD93D'],[8,23,'#FFD93D'],[9,23,'#FFD93D'],[10,23,'#FFD93D'],
+  [11,23,'#FFD93D'],[12,23,'#FFD93D'],
+  [9,22,'#C0C0C0'],[10,22,'#C0C0C0'],
+  [8,21,'#D0D0D0']
+]},
+toilet:{set:[
+  [17,20,'#D0D0D0'],[18,20,'#D0D0D0'],[17,21,'#C0C0C0'],[18,21,'#C0C0C0'],
+  [17,22,'#B0B0B0'],[18,22,'#B0B0B0'],
+  [17,23,'#C0C0C0'],[18,23,'#C0C0C0'],
+  [17,24,'#D0D0D0'],[18,24,'#D0D0D0'],
+  [17,19,'#8B6914'],[18,19,'#8B6914']
+]},
+walk:{set:[
+  [0,25,'#4CAF50'],[1,25,'#4CAF50'],[2,25,'#66BB6A'],[3,25,'#4CAF50'],
+  [4,25,'#66BB6A'],[5,25,'#4CAF50'],[6,25,'#66BB6A'],[7,25,'#4CAF50'],
+  [8,25,'#66BB6A'],[9,25,'#4CAF50'],[10,25,'#66BB6A'],[11,25,'#4CAF50'],
+  [12,25,'#66BB6A'],[13,25,'#4CAF50'],[14,25,'#66BB6A'],[15,25,'#4CAF50'],
+  [16,25,'#66BB6A'],[17,25,'#4CAF50'],[18,25,'#66BB6A'],[19,25,'#4CAF50'],
+  [0,26,'#388E3C'],[1,26,'#388E3C'],[2,26,'#388E3C'],[3,26,'#388E3C'],
+  [4,26,'#388E3C'],[5,26,'#388E3C'],[6,26,'#388E3C'],[7,26,'#388E3C'],
+  [8,26,'#388E3C'],[9,26,'#388E3C'],[10,26,'#388E3C'],[11,26,'#388E3C'],
+  [12,26,'#388E3C'],[13,26,'#388E3C'],[14,26,'#388E3C'],[15,26,'#388E3C'],
+  [16,26,'#388E3C'],[17,26,'#388E3C'],[18,26,'#388E3C'],[19,26,'#388E3C'],
+  [3,24,'#FF6B81'],[4,24,'#FF6B81'],[3,23,'#FF8FAB'],
+  [15,24,'#FFD93D'],[16,24,'#FFD93D'],[15,23,'#FFE66D']
+]},
+work:{set:[
+  [5,21,'#444'],[6,21,'#444'],[7,21,'#444'],[8,21,'#444'],
+  [9,21,'#444'],[10,21,'#444'],[11,21,'#444'],[12,21,'#444'],[13,21,'#444'],[14,21,'#444'],
+  [5,22,'#444'],[6,22,'#7EC8E8'],[7,22,'#7EC8E8'],[8,22,'#7EC8E8'],
+  [9,22,'#7EC8E8'],[10,22,'#7EC8E8'],[11,22,'#7EC8E8'],[12,22,'#7EC8E8'],
+  [13,22,'#7EC8E8'],[14,22,'#444'],
+  [5,23,'#444'],[6,23,'#444'],[7,23,'#444'],[8,23,'#444'],
+  [9,23,'#444'],[10,23,'#444'],[11,23,'#444'],[12,23,'#444'],[13,23,'#444'],[14,23,'#444']
+]},
+study:{set:[
+  [5,22,'#D4A574'],[6,22,'#F5DEB3'],[7,22,'#F5DEB3'],[8,22,'#F5DEB3'],
+  [9,22,'#D4A574'],[10,22,'#D4A574'],[11,22,'#F5DEB3'],
+  [12,22,'#F5DEB3'],[13,22,'#F5DEB3'],[14,22,'#D4A574'],
+  [5,23,'#D4A574'],[6,23,'#8B6914'],[7,23,'#8B6914'],[8,23,'#D4A574'],
+  [9,23,'#D4A574'],[10,23,'#D4A574'],[11,23,'#8B6914'],
+  [12,23,'#8B6914'],[13,23,'#D4A574'],[14,23,'#D4A574']
+]}
+};
+
+var PAL={'0':null,'1':'#F5A623','2':'#E08620','3':'#F5A623',
+  'P':'#FFB6C1','B':'#3D2817','N':'#FF8FAB','W':'#FFFFFF'};
+
+var STATUS_META=[
+  {r:'bath',n:'洗澡'},{r:'eat',n:'吃饭'},{r:'toilet',n:'上厕所'},
+  {r:'walk',n:'散步'},{r:'work',n:'工作'},{r:'study',n:'学习'}
+];
+var MOOD_META=[
+  {r:'happy',n:'开心'},{r:'calm',n:'平静'},{r:'sad',n:'难过'},
+  {r:'angry',n:'生气'},{r:'sleepy',n:'困倦'},{r:'hungry',n:'饿了'},
+  {r:'surprised',n:'惊讶'},{r:'shy',n:'害羞'},{r:'miss',n:'想主人'},{r:'daze',n:'发呆'}
+];
+
+function gc(g,r,c){return(r>=0&&r<g.length&&c>=0&&c<g[r].length)?g[r][c]:'0'}
+
+function render(){
+  var cv=document.getElementById('pet-canvas');
+  if(!cv)return;
+  var ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,cv.width,cv.height);
+  var g=CAT.map(function(r){return r.split('')});
+
+  // 眼睛
+  var e=EYES[petCur.mr]||EYES.daze;
+  if(e.c){e.c.forEach(function(p){g[p[1]][p[0]]='W'})}
+  if(e.a){e.a.forEach(function(p){if(g[p[1]])g[p[1]][p[0]]='B'})}
+  if(e.extra){
+    e.extra.clear.forEach(function(p){g[p[1]][p[0]]='0'});
+    e.extra.set.forEach(function(p){if(g[p[1]])g[p[1]][p[0]]=p[2]});
+  }
+
+  // 道具
+  var pr=PROPS[petCur.sr];
+  if(pr){pr.set.forEach(function(p){if(g[p[1]])g[p[1]][p[0]]=p[2]})}
+
+  // 绘制
+  for(var r=0;r<ROWS;r++){
+    for(var c=0;c<COLS;c++){
+      var v=gc(g,r,c);
+      var col=PAL[v]||v;
+      if(col&&col.length>0){
+        ctx.fillStyle=col;
+        ctx.fillRect(c*PX,r*PX,PX,PX);
+      }
+    }
+  }
+  document.getElementById('pet-status-text').textContent=
+    '小猫正在'+petCur.mn+'…（'+petCur.sn+'中）';
+}
+
+function petRenderBtns(){
+  var sb=document.getElementById('pet-status-btns');
+  var mb=document.getElementById('pet-mood-btns');
+  if(!sb||!mb)return;
+  sb.innerHTML='';mb.innerHTML='';
+
+  STATUS_META.forEach(function(s){
+    var b=document.createElement('button');
+    b.className='pet-btn'+(petCur.sr===s.r?' active':'');
+    b.textContent=s.n;b.dataset.ref=s.r;
+    b.onclick=function(){petChange('status',s.r,s.n)};
+    sb.appendChild(b);
+  });
+  petCust.s.forEach(function(it){
+    var b=document.createElement('button');
+    b.className='pet-btn'+(petCur.sr===it.r?' active':'');
+    b.textContent=it.n;
+    var del=document.createElement('span');
+    del.className='pet-del-btn';del.textContent='✕';
+    del.onclick=function(ev){ev.stopPropagation();petDel(it.id)};
+    b.appendChild(del);
+    b.onclick=function(){petChange('status',it.r,it.n)};
+    sb.appendChild(b);
+  });
+
+  MOOD_META.forEach(function(m){
+    var b=document.createElement('button');
+    b.className='pet-btn'+(petCur.mr===m.r?' active':'');
+    b.textContent=m.n;b.dataset.ref=m.r;
+    b.onclick=function(){petChange('mood',m.r,m.n)};
+    mb.appendChild(b);
+  });
+  petCust.m.forEach(function(it){
+    var b=document.createElement('button');
+    b.className='pet-btn'+(petCur.mr===it.r?' active':'');
+    b.textContent=it.n;
+    var del=document.createElement('span');
+    del.className='pet-del-btn';del.textContent='✕';
+    del.onclick=function(ev){ev.stopPropagation();petDel(it.id)};
+    b.appendChild(del);
+    b.onclick=function(){petChange('mood',it.r,it.n)};
+    mb.appendChild(b);
+  });
+}
+
+function petUpdateRefSelect(){
+  var sel=document.getElementById('pet-custom-ref');
+  if(!sel)return;sel.innerHTML='';
+  var t=document.getElementById('pet-custom-type').value;
+  var items=t==='status'?STATUS_META:MOOD_META;
+  items.forEach(function(it){
+    var o=document.createElement('option');o.value=it.r;o.textContent=it.n;
+    sel.appendChild(o);
+  });
+}
+
+async function petLoad(){
+  try{
+    var st=await supabaseClient.from('pet_state').select('*').eq('id',1).maybeSingle();
+    if(st.data){
+      petCur={sr:st.data.status_ref,sn:st.data.status_name,mr:st.data.mood_ref,mn:st.data.mood_name};
+    }
+    var cu=await supabaseClient.from('pet_custom').select('*').order('created_at');
+    if(cu.data){
+      petCust={s:[],m:[]};
+      cu.data.forEach(function(it){
+        if(it.type==='status')petCust.s.push({id:it.id,n:it.name,r:it.ref});
+        else petCust.m.push({id:it.id,n:it.name,r:it.ref});
+      });
+    }
+  }catch(e){console.error('petLoad:',e)}
+  render();petRenderBtns();petUpdateRefSelect();
+}
+
+async function petChange(type,ref,name){
+  var old=JSON.parse(JSON.stringify(petCur));
+  if(type==='status'){petCur.sr=ref;petCur.sn=name}
+  else{petCur.mr=ref;petCur.mn=name}
+  render();petRenderBtns();
+  try{
+    var u={};
+    if(type==='status'){u.status_ref=ref;u.status_name=name}
+    else{u.mood_ref=ref;u.mood_name=name}
+    await supabaseClient.from('pet_state').update(u).eq('id',1);
+  }catch(e){
+    console.error('petChange:',e);
+    petCur=old;render();petRenderBtns();
+  }
+}
+
+async function petDel(id){
+  try{
+    await supabaseClient.from('pet_custom').delete().eq('id',id);
+    await petLoad();
+  }catch(e){console.error('petDel:',e)}
+}
+
+window.petAddCustom=async function(){
+  var type=document.getElementById('pet-custom-type').value;
+  var name=document.getElementById('pet-custom-name').value.trim();
+  var ref=document.getElementById('pet-custom-ref').value;
+  if(!name){alert('请输入名称');return}
+  try{
+    await supabaseClient.from('pet_custom').insert({type:type,name:name,ref:ref});
+    document.getElementById('pet-custom-name').value='';
+    await petLoad();
+  }catch(e){console.error('petAddCustom:',e);alert('添加失败')}
+};
+
+function petRealtime(){
+  if(petChan){try{supabaseClient.removeChannel(petChan)}catch(e){}petChan=null}
+  petChan=supabaseClient.channel('pet-sync-v1',{broadcast:{self:false},presence:{key:''}})
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'pet_state'},function(p){
+      var n=p.new;
+      petCur={sr:n.status_ref,sn:n.status_name,mr:n.mood_ref,mn:n.mood_name};
+      render();petRenderBtns();
+    })
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'pet_custom'},function(){petLoad()})
+    .on('postgres_changes',{event:'DELETE',schema:'public',table:'pet_custom'},function(){petLoad()})
+    .subscribe();
+}
+
+async function initPetSystem(){
+  if(petInited)return;
+  if(!supabaseClient)return;
+  petInited=true;
+  await petLoad();
+  petRealtime();
+  document.getElementById('pet-custom-type').addEventListener('change',petUpdateRefSelect);
+}
+
+// tab 切换联动
+var petTabBtn=document.querySelector('[data-tab="tab-pet"]');
+if(petTabBtn){
+  petTabBtn.addEventListener('click',function(){
+    if(!petInited)initPetSystem();
+  });
+  var petObs=new MutationObserver(function(){
+    var panel=document.getElementById('tab-pet');
+    if(!panel)return;
+    if(!panel.classList.contains('active')&&petChan){
+      try{supabaseClient.removeChannel(petChan)}catch(e){}petChan=null;
+    }else if(panel.classList.contains('active')&&petInited&&!petChan){
+      petRealtime();
+    }
+  });
+  var petPanel=document.getElementById('tab-pet');
+  if(petPanel)petObs.observe(petPanel,{attributes:true,attributeFilter:['class']});
+}
+})();
+
+// ============ 宠物练习 END ============
 
 </script>
 
