@@ -1,10 +1,11 @@
-const CACHE_NAME = 'paynews-v4';
+const CACHE_NAME = 'paynews-v5';
 const STATIC_ASSETS = [
   '/paynews/',
   '/paynews/index.html',
   '/paynews/manifest.json',
   '/paynews/icon-192.png',
   '/paynews/icon-512.png',
+  '/paynews/vendor/supabase-js.esm.js',
   '/paynews/pet-assets/cat_work.png',
   '/paynews/pet-assets/cat_study.png',
   '/paynews/pet-assets/cat_eat.png',
@@ -31,16 +32,17 @@ self.addEventListener('install', event => {
   self.skipWaiting();
 });
 
-// 激活：清理旧缓存
+// 激活：清理旧缓存，并强制所有已打开页面用新 SW 重新加载（打破旧缓存死锁）
 self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(keys => {
-      return Promise.all(
-        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
-      );
-    })
-  );
-  self.clients.claim();
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)));
+    await self.clients.claim();
+    const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of clients) {
+      try { await c.navigate(c.url); } catch (e) { /* ignore */ }
+    }
+  })());
 });
 
 // 请求拦截
