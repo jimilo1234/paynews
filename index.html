@@ -3611,18 +3611,24 @@ async function initPetSystem(){
   var catImg=document.getElementById('pet-cat');
   // 如果DOM还没解析到宠物tab，先不标记为已初始化，等tab点击再试
   if(!catImg){petInited=false;return;}
+  // 优先把猫图渲染出来；只要这一步成功，用户就不会再看到白框
+  try{
+    render();
+  }catch(e){
+    console.error('宠物渲染失败:',e);
+    petInited=false; // 允许 tab 点击时重试
+    return;
+  }
   try{
     petRenderBtns();
     petUpdateRefSelect();
-    render();
   }catch(e){
-    console.error('宠物初始化错误:',e);
+    console.error('宠物按钮初始化错误:',e);
   }
   document.getElementById('pet-custom-type').addEventListener('change',petUpdateRefSelect);
   // Supabase数据加载（失败不影响显示）
   if(supabaseClient){
-    await petLoad();
-    petRealtime();
+    try{ await petLoad(); petRealtime(); }catch(e){ console.error('宠物数据加载错误:',e); }
   }
 }
 
@@ -3636,7 +3642,14 @@ if(petTabBtn){
   petTabBtn.addEventListener('click',function(){
     if(!petInited){initPetSystem();return;}
     var catImg=document.getElementById('pet-cat');
-    if(catImg&&!catImg.src){render();}
+    // 兜底：如果猫图还没 src，强制再 render 一次
+    if(catImg){
+      if(!catImg.src){ render(); }
+      else {
+        // 切到宠物 tab 时重新对齐当前状态
+        render();
+      }
+    }
   });
   var petObs=new MutationObserver(function(){
     var panel=document.getElementById('tab-pet');
@@ -3711,7 +3724,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange',function(){
     if(!_swReloaded){_swReloaded=true;location.reload();}
   });
-  navigator.serviceWorker.register('/paynews/sw.js').then(() => {
+  navigator.serviceWorker.register('/paynews/sw.js?v=7').then(() => {
     console.log('[PWA] Service Worker 已注册');
     // 首次安装后请求通知权限
     if ('Notification' in window && Notification.permission === 'default') {
@@ -3748,6 +3761,23 @@ setInterval(async () => {
     if (latest.id > _pollLastId) _pollLastId = latest.id;
   } catch(e) {}
 }, 3000);
+</script>
+
+
+<!-- 宠物图防缓存兜底：若 2s 内仍未加载，强制刷新一次（ bust ServiceWorker 旧缓存） -->
+<script>
+(function(){
+  if(location.search.indexOf('petnocache=')>-1) return; // 只重试一次，避免死循环
+  setTimeout(function(){
+    var catImg=document.getElementById('pet-cat');
+    var hasInline=typeof PET_IMG!=='undefined';
+    if(!catImg || !catImg.src || !hasInline){
+      console.warn('[StaleCheck] 宠物未加载或缺 PET_IMG，强制刷新...');
+      var sep=location.search?'&':'?';
+      location.href=location.href+sep+'petnocache='+Date.now();
+    }
+  }, 2000);
+})();
 </script>
 
 </body>
