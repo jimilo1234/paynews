@@ -839,7 +839,10 @@ html.light .guest-id.broadcasting { color: #222; }
   </div>
 
   <!-- Supabase JS SDK -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module">
+    import * as Supabase from '/paynews/vendor/supabase-js.esm.js';
+    window.supabase = Supabase;
+  </script>
 
   <script>
 // ===== SVG 图标（简约商务线条风） =====
@@ -866,15 +869,18 @@ const ICO = {
 const SUPABASE_URL = 'https://wwxzycfdfyyljkjfcbjt.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_0WePrzUk-LVH3TK7RFT_fQ_5r3C0dvP';
 
-let supabaseClient;
-try {
-  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-} catch (e) {
-  console.error('Supabase 初始化失败:', e);
+let supabaseClient = null;
+function initSupabase(){
+  try {
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  } catch (e) {
+    console.error('Supabase 初始化失败:', e);
+  }
+  if (supabaseClient) restoreSession();
 }
 
 // 检查是否有保存的session，尝试恢复登录
-(async function restoreSession() {
+async function restoreSession() {
   if (!supabaseClient) return;
   try {
     const saved = localStorage.getItem('paynews_session');
@@ -897,7 +903,7 @@ try {
   } catch(e) {
     console.error('[Session] 恢复检查失败:', e);
   }
-})();
+}
 // 监听postMessage接收来自扩展的登录状态
 window.addEventListener("message", function(event) {
   if (event.data && event.data.type === "paynews-session" && event.data.session) {
@@ -2255,6 +2261,7 @@ function stopPTT(e) {
 
 // ===== 初始化 =====
 document.addEventListener('DOMContentLoaded', async () => {
+  initSupabase();
   // 注入SVG图标
   const icoMap = {'ico-img': ICO.img, 'ico-video': ICO.video, 'ico-mic': ICO.mic, 'ico-refresh': ICO.refresh, 'ico-del': ICO.del, 'ico-walkie': ICO.walkie};
   Object.entries(icoMap).forEach(([id, svg]) => { const el = document.getElementById(id); if (el) el.innerHTML = svg; });
