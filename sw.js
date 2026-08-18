@@ -1,4 +1,4 @@
-const CACHE_NAME = 'paynews-v3';
+const CACHE_NAME = 'paynews-v4';
 const STATIC_ASSETS = [
   '/paynews/',
   '/paynews/index.html',
@@ -43,11 +43,17 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
-// 请求拦截：网络优先，失败时回退缓存
+// 请求拦截
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   // 跳过 Supabase API 请求（保持实时性）
   if (event.request.url.includes('supabase.co')) return;
+  // 导航请求（HTML页面）永远走网络、不缓存，确保用户始终拿到最新 index.html
+  if (event.request.mode === 'navigate') {
+    event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+    return;
+  }
+  // 静态资源：网络优先，失败时回退缓存
   event.respondWith(
     fetch(event.request)
       .then(response => {
