@@ -663,8 +663,10 @@ html.light .guest-id.broadcasting { color: #222; }
 
 /* ===== 宠物练习 ===== */
 .pet-container{text-align:center;padding:16px 0}
-#pet-grid{border-radius:12px;background:#FAFAFA;margin:0 auto 12px;display:grid;grid-template-columns:repeat(20,14px);grid-template-rows:repeat(27,14px);gap:0;max-width:100%}
-#pet-grid .px{width:14px;height:14px}
+.pet-cat-wrap{position:relative;display:inline-block;margin:0 auto 12px;width:200px;height:200px;line-height:0}
+.pet-cat{width:200px;height:200px;image-rendering:pixelated;display:block;border-radius:16px;background:#FAFAFA}
+.pet-mood{position:absolute;top:-4px;right:4px;width:66px;height:66px;image-rendering:pixelated;pointer-events:none;filter:drop-shadow(0 2px 5px rgba(0,0,0,.28));animation:petFloat 2.6s ease-in-out infinite}
+@keyframes petFloat{0%,100%{transform:translateY(0) rotate(-5deg)}50%{transform:translateY(-9px) rotate(5deg)}}
 .pet-status-text{font-size:15px;color:#333;margin-bottom:12px;min-height:22px}
 .pet-section{margin-bottom:14px}
 .pet-section-title{font-size:12px;color:#999;margin-bottom:6px;text-align:left}
@@ -762,7 +764,10 @@ html.light .guest-id.broadcasting { color: #222; }
       <!-- 宠物练习 tab -->
       <div class="tab-panel" id="tab-pet">
         <div class="pet-container">
-          <img id="pet-img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAARgAAAF6CAYAAADCskfdAAAF8UlEQVR4nO3doVJVURSAYa9DAoNNOxRfwuwrQOQpTASST2GEVyD7Ehbo2gxAxWjB0dncf1/O4fv6mX2Gw/1nlTV782oh7i4OH2aed3Bys5l5Hsvm//Nxr3f9AsB6CQyQERggIzBARmCAjMAAGYEBMgIDZAQGyAgMkBEYICMwQEZggMz0jczZW6ezLWXLlcf5/9wuEwyQERggIzBARmCAjMAAGYEBMgIDZAQGyAgMkBEYICMwQEZggIzAAJm90QdHt073334dOu/+1+nQc7BGo7+ju4vTod/t6Ba2CQbICAyQERggIzBARmCAjMAAGYEBMgIDZAQGyAgMkBEYICMwQEZggMzwNvUoW9HwdEv5HZlggIzAABmBATICA2QEBsgIDJARGCAjMEBGYICMwAAZgQEyAgNkBAbITN+mXrvRO7thjUwwQEZggIzAABmBATICA2QEBsgIDJARGCAjMEBGYICMwAAZgQEyAgNkBAbICAyQERggIzBARmCAjMAAGYEBMgIDZAQGyAgMkBEYICMwQEZggIzAAJmNu5SBigkGyAgMkBEYICMwQEZggIzAABmBATICA2QEBsgIDJARGCAjMEBGYICMwAAZgQEyAgNkBAbICAyQERggIzBARmCAjMAAGYEBMgIDZAQGyAgMkBEYILO36xeo7R9f7/oV/sv95dGuX2FVfPfnwQQDZAQGyAgMkBEYICMwQEZggIzAABmBATICA2QEBsgIDJARGCAjMEBm9dvUoz5+eD/03LfvP7b8Jszku2+XCQbICAyQERggIzBARmCAjMAAGYEBMgIDZAQGyAgMkBEYICMwQEZggMzm7uLwYdcvAayTCQbICAyQERggIzBARmCAjMAAGYEBMgIDZAQGyAgMkBEYICMwQEZggIy7qf9i/+eXqefdv/s89by18/2eBxMMkBEYICMwQEZggIzAABmBATICA2QEBsgIDJARGCAjMEBGYICMwACZzeiD7rSGl+Pg5GaoFSYYICMwQEZggIzAABmBATICA2QEBsgIDJARGCAjMEBGYICMwAAZgQEy7qbesk/nt0PPXZ292fKbvGy+w/NgggEyAgNkBAbICAyQERggIzBARmCAjMAAGYEBMgIDZAQGyAgMkBEYIONuauCf3E0NPDsCA2QEBsgIDJARGCAjMEBGYICMwAAZgQEyAgNkBAbICAyQERggM7xNPcoWNuzO6Fb0KBMMkBEYICMwQEZggIzAABmBATICA2QEBsgIDJARGCAjMEBGYICMwACZ6dvUo2xhwx+zt6JHmWCAjMAAGYEBMgIDZAQGyAgMkBEYICMwQEZggIzAABmBATICA2QEBsgIDJARGCAjMEBGYICMwAAZgQEyAgNkBAbICAyQERggIzBARmCAjMAAGYEBMou43/Yp3Gn9uE/nt1PPuzp7M/W8pVjKHdOjTDBARmCAjMAAGYEBMgIDZAQGyAgMkBEYICMwQEZggIzAABmBATICA2QWs8lpK3q79o+vp553f3k09by1W8oWtgkGyAgMkBEYICMwQEZggIzAABmBATICA2QEBsgIDJARGCAjMEBGYIDM9I1MW9GwO7O3sE0wQEZggIzAABmBATICA2QEBsgIDJARGCAjMEBGYICMwAAZgQEyAgNkhjcrbUXDyzG6hW2CATICA2QEBsgIDJARGCAjMEBGYICMwAAZgQEyAgNkBAbICAyQERggIzBARmCAjMAAGYEBMgIDZAQGyAgMkBEYICMwQEZggIzAABmBATICA2QEBsgM3009ail3Wo/exTtqKX+XpfD9Hjf772KCATICA2QEBsgIDJARGCAjMEBGYICMwAAZgQEyAgNkBAbICAyQERggIzBARmCAjMAAGYEBMgIDZAQGyAgMkBEYICMwQEZggIzAABmBATICA2QEBsgIDJARGCAjMEBGYICMwAAZgQEyAgNkBAbICAyQERggIzBARmCAjMAAGYEBMgIDZAQGyAgMkBEYICMwQEZggIzAABmBATICA2QEBsgIDJARGCAjMEBGYIDMb9EidHG6whdzAAAAAElFTkSuQmCC" alt="像素猫" style="border-radius:12px;margin:0 auto 12px;display:block;max-width:100%;width:280px;height:auto;">
+                <div class="pet-cat-wrap">
+        <img id="pet-cat" class="pet-cat" alt="像素猫" />
+        <img id="pet-mood" class="pet-mood" alt="心情" />
+      </div>
           <div class="pet-status-text" id="pet-status-text">小猫正在发呆...</div>
           <div class="pet-section">
             <div class="pet-section-title">🐾 状态</div>
@@ -3436,51 +3441,12 @@ var MOOD_META=[
 function gc(g,r,c){return(r>=0&&r<g.length&&c>=0&&c<g[r].length)?g[r][c]:'0'}
 
 function render(){
-  var grid=document.getElementById('pet-grid');
-  if(!grid){
-    console.error('[Pet] pet-grid元素不存在');
-    return;
-  }
-  try{
-  grid.innerHTML='';
-  
-  var g=CAT.map(function(r){return r.split('')});
-
-  // 眼睛
-  var e=EYES[petCur.mr]||EYES.daze;
-  if(e.c){e.c.forEach(function(p){g[p[1]][p[0]]='W'})}
-  if(e.a){e.a.forEach(function(p){if(g[p[1]])g[p[1]][p[0]]='B'})}
-  if(e.extra){
-    e.extra.clear.forEach(function(p){g[p[1]][p[0]]='0'});
-    e.extra.set.forEach(function(p){if(g[p[1]])g[p[1]][p[0]]=p[2]});
-  }
-
-  // 道具
-  var pr=PROPS[petCur.sr];
-  if(pr){pr.set.forEach(function(p){if(g[p[1]])g[p[1]][p[0]]=p[2]})}
-
-  // 渲染为div
-  for(var r=0;r<ROWS;r++){
-    for(var c=0;c<COLS;c++){
-      var v=gc(g,r,c);
-      var col=PAL[v];
-      var cell=document.createElement('div');
-      cell.className='px';
-      if(col){
-        cell.style.backgroundColor=col;
-      }
-      grid.appendChild(cell);
-    }
-  }
-  
+  var catImg=document.getElementById('pet-cat');
+  var moodImg=document.getElementById('pet-mood');
+  if(catImg)catImg.src='pet-assets/cat_'+(petCur.sr||'work')+'.png';
+  if(moodImg)moodImg.src='pet-assets/mood_'+(petCur.mr||'calm')+'.png';
   var statusText=document.getElementById('pet-status-text');
-  if(statusText){
-    statusText.textContent='小猫正在'+petCur.mn+'…（'+petCur.sn+'中）';
-  }
-  }catch(e){
-    console.error('[Pet] render错误:',e);
-    grid.innerHTML='<div style="grid-column:1/-1;padding:20px;color:red;text-align:center;">渲染错误: '+e.message+'</div>';
-  }
+  if(statusText)statusText.textContent='小猫正在'+petCur.mn+'\u2026（'+petCur.sn+'中）';
 }
 
 function petRenderBtns(){
