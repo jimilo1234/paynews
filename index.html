@@ -3676,6 +3676,11 @@ if(petTabBtn){
 <script>
 // 注册 Service Worker（PWA离线缓存 + 推送通知）
 if ('serviceWorker' in navigator) {
+  // SW 新版本接管控制后，强制刷新一次，确保拿到最新页面（破解旧 SW 缓存旧 HTML 的死循环）
+  let _swReloaded=false;
+  navigator.serviceWorker.addEventListener('controllerchange',function(){
+    if(!_swReloaded){_swReloaded=true;location.reload();}
+  });
   navigator.serviceWorker.register('/paynews/sw.js').then(() => {
     console.log('[PWA] Service Worker 已注册');
     // 首次安装后请求通知权限
