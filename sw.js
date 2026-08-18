@@ -4,7 +4,23 @@ const STATIC_ASSETS = [
   '/paynews/index.html',
   '/paynews/manifest.json',
   '/paynews/icon-192.png',
-  '/paynews/icon-512.png'
+  '/paynews/icon-512.png',
+  '/paynews/pet-assets/cat_work.png',
+  '/paynews/pet-assets/cat_study.png',
+  '/paynews/pet-assets/cat_eat.png',
+  '/paynews/pet-assets/cat_exercise.png',
+  '/paynews/pet-assets/cat_sleep.png',
+  '/paynews/pet-assets/cat_listen.png',
+  '/paynews/pet-assets/mood_calm.png',
+  '/paynews/pet-assets/mood_happy.png',
+  '/paynews/pet-assets/mood_sad.png',
+  '/paynews/pet-assets/mood_angry.png',
+  '/paynews/pet-assets/mood_surprised.png',
+  '/paynews/pet-assets/mood_sleepy.png',
+  '/paynews/pet-assets/mood_excited.png',
+  '/paynews/pet-assets/mood_love.png',
+  '/paynews/pet-assets/mood_cry.png',
+  '/paynews/pet-assets/mood_daze.png',
 ];
 
 // 安装：预缓存静态资源
