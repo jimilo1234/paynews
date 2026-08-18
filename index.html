@@ -842,6 +842,7 @@ html.light .guest-id.broadcasting { color: #222; }
   <script type="module">
     import * as Supabase from '/paynews/vendor/supabase-js.esm.js';
     window.supabase = Supabase;
+    if (window.initSupabase) window.initSupabase();
   </script>
 
   <script>
@@ -871,6 +872,7 @@ const SUPABASE_KEY = 'sb_publishable_0WePrzUk-LVH3TK7RFT_fQ_5r3C0dvP';
 
 let supabaseClient = null;
 function initSupabase(){
+  if (supabaseClient) return;  // 已初始化则跳过（module 与 DOMContentLoaded 可能都调用）
   try {
     supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   } catch (e) {
@@ -1506,7 +1508,7 @@ async function doLogin() {
 
   } catch (err) {
     console.error('登录失败:', err);
-    errorEl.textContent = '活动火热，稍后再试';
+    errorEl.textContent = (err && err.message) ? ('登录失败：' + err.message) : '活动火热，稍后再试';
   } finally {
     loginBtn.disabled = false;
     loginBtn.textContent = '发布新闻';
