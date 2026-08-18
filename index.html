@@ -3437,7 +3437,11 @@ function gc(g,r,c){return(r>=0&&r<g.length&&c>=0&&c<g[r].length)?g[r][c]:'0'}
 
 function render(){
   var grid=document.getElementById('pet-grid');
-  if(!grid)return;
+  if(!grid){
+    console.error('[Pet] pet-grid元素不存在');
+    return;
+  }
+  try{
   grid.innerHTML='';
   
   var g=CAT.map(function(r){return r.split('')});
@@ -3472,6 +3476,10 @@ function render(){
   var statusText=document.getElementById('pet-status-text');
   if(statusText){
     statusText.textContent='小猫正在'+petCur.mn+'…（'+petCur.sn+'中）';
+  }
+  }catch(e){
+    console.error('[Pet] render错误:',e);
+    grid.innerHTML='<div style="grid-column:1/-1;padding:20px;color:red;text-align:center;">渲染错误: '+e.message+'</div>';
   }
 }
 
@@ -3619,6 +3627,10 @@ async function initPetSystem(){
     console.log('[Pet] 渲染完成');
   }catch(e){
     console.error('[Pet] 渲染错误:',e);
+    var grid=document.getElementById('pet-grid');
+    if(grid){
+      grid.innerHTML='<div style="grid-column:1/-1;padding:20px;color:red;text-align:center;font-size:14px;">初始化失败: '+e.message+'<br>请刷新重试</div>';
+    }
   }
   document.getElementById('pet-custom-type').addEventListener('change',petUpdateRefSelect);
   // Supabase数据加载（失败不影响显示）
