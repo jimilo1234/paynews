@@ -3443,8 +3443,8 @@ function gc(g,r,c){return(r>=0&&r<g.length&&c>=0&&c<g[r].length)?g[r][c]:'0'}
 function render(){
   var catImg=document.getElementById('pet-cat');
   var moodImg=document.getElementById('pet-mood');
-  if(catImg)catImg.src='/paynews/pet-assets/cat_'+(petCur.sr||'work')+'.png';
-  if(moodImg)moodImg.src='/paynews/pet-assets/mood_'+(petCur.mr||'calm')+'.png';
+  if(catImg)catImg.src='/paynews/pet-assets/cat_'+(petCur.sr||'work')+'.png?v=3';
+  if(moodImg)moodImg.src='/paynews/pet-assets/mood_'+(petCur.mr||'calm')+'.png?v=3';
   var statusText=document.getElementById('pet-status-text');
   if(statusText)statusText.textContent='小猫正在'+petCur.mn+'\u2026（'+petCur.sn+'中）';
 }
