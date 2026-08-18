@@ -1,43 +1,18 @@
-const CACHE_NAME = 'paynews-v6';
+const CACHE_NAME = 'paynews-v7';
 
-// 只预缓存确实存在的静态资源；任何一项失败都不影响 SW 安装（用 .catch 兜底）
-const STATIC_ASSETS = [
-  '/paynews/vendor/supabase-js.umd.js',
-  '/paynews/pet-assets/cat_work.png',
-  '/paynews/pet-assets/cat_study.png',
-  '/paynews/pet-assets/cat_eat.png',
-  '/paynews/pet-assets/cat_exercise.png',
-  '/paynews/pet-assets/cat_sleep.png',
-  '/paynews/pet-assets/cat_listen.png',
-  '/paynews/pet-assets/mood_calm.png',
-  '/paynews/pet-assets/mood_happy.png',
-  '/paynews/pet-assets/mood_sad.png',
-  '/paynews/pet-assets/mood_angry.png',
-  '/paynews/pet-assets/mood_surprised.png',
-  '/paynews/pet-assets/mood_sleepy.png',
-  '/paynews/pet-assets/mood_excited.png',
-  '/paynews/pet-assets/mood_love.png',
-  '/paynews/pet-assets/mood_cry.png',
-  '/paynews/pet-assets/mood_daze.png',
-];
-
+// v7: 彻底放弃缓存应用壳，只做透传 + 通知事件。
+// 过去 v1~v6 的缓存死锁已导致多次旧 index.html 无法更新；v7 不再缓存任何导航/静态请求。
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(STATIC_ASSETS).catch(err => {
-        console.warn('预缓存部分资源失败（已忽略，不影响安装）:', err);
-      }))
-  );
-  self.skipWaiting(); // 立即激活，不等旧页面关闭
+  event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
-    // 删除所有旧缓存（v1~v5），彻底清掉可能残留的旧 index.html
+    // 删除所有历史缓存，包括 v1~v6 及任何意外缓存
     const keys = await caches.keys();
-    await Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)));
+    await Promise.all(keys.map(k => caches.delete(k)));
     await self.clients.claim();
-    // 强制所有已打开页面用新 SW 重新加载，打破旧缓存死锁
+    // 强制所有已打开页面重新加载，确保用上最新 index.html
     const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     for (const c of clients) {
       try { await c.navigate(c.url); } catch (e) { /* ignore */ }
@@ -47,23 +22,21 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   const req = event.request;
-  if (req.method !== 'GET') return;                 // 非 GET（含登录 POST）直接放行
-  if (req.url.includes('supabase.co')) return;       // Supabase API 实时，不缓存
-  // 导航请求（HTML 页面）永远走网络、不缓存，确保始终拿到最新 index.html
+  // 非 GET、Supabase 实时接口：完全放行
+  if (req.method !== 'GET' || req.url.includes('supabase.co')) return;
+
+  // 导航请求：强制 bypass 任何缓存，永远从网络取最新 HTML
   if (req.mode === 'navigate') {
-    event.respondWith(fetch(req).catch(() => caches.match('/paynews/index.html')));
+    event.respondWith(
+      fetch(req, { cache: 'no-cache' })
+        .catch(() => new Response('网络离线，请连接网络后刷新', { status: 503, headers: { 'Content-Type': 'text/plain;charset=utf-8' } }))
+    );
     return;
   }
-  // 静态资源：网络优先，成功则写入缓存；失败时回退缓存
+
+  // 其余静态资源：网络优先，失败时回退缓存（仅做离线兜底，不再主动缓存）
   event.respondWith(
-    fetch(req)
-      .then(response => {
-        if (response && response.status === 200) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(req, clone));
-        }
-        return response;
-      })
+    fetch(req, { cache: 'no-cache' })
       .catch(() => caches.match(req))
   );
 });
