@@ -3605,10 +3605,21 @@ async function initPetSystem(){
   console.log('[Pet] initPetSystem 调用，petInited='+petInited);
   if(petInited)return;
   petInited=true;
-  // 先渲染猫和按钮，不依赖Supabase
-  petRenderBtns();
-  petUpdateRefSelect();
-  render();
+  console.log('[Pet] 开始渲染...');
+  try{
+    var grid=document.getElementById('pet-grid');
+    console.log('[Pet] pet-grid元素:',grid);
+    // 先渲染猫和按钮，不依赖Supabase
+    console.log('[Pet] 调用petRenderBtns...');
+    petRenderBtns();
+    console.log('[Pet] 调用petUpdateRefSelect...');
+    petUpdateRefSelect();
+    console.log('[Pet] 调用render...');
+    render();
+    console.log('[Pet] 渲染完成');
+  }catch(e){
+    console.error('[Pet] 渲染错误:',e);
+  }
   document.getElementById('pet-custom-type').addEventListener('change',petUpdateRefSelect);
   // Supabase数据加载（失败不影响显示）
   if(supabaseClient){
