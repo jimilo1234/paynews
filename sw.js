@@ -1,11 +1,8 @@
-const CACHE_NAME = 'paynews-v5';
+const CACHE_NAME = 'paynews-v6';
+
+// 只预缓存确实存在的静态资源；任何一项失败都不影响 SW 安装（用 .catch 兜底）
 const STATIC_ASSETS = [
-  '/paynews/',
-  '/paynews/index.html',
-  '/paynews/manifest.json',
-  '/paynews/icon-192.png',
-  '/paynews/icon-512.png',
-  '/paynews/vendor/supabase-js.esm.js',
+  '/paynews/vendor/supabase-js.umd.js',
   '/paynews/pet-assets/cat_work.png',
   '/paynews/pet-assets/cat_study.png',
   '/paynews/pet-assets/cat_eat.png',
@@ -24,20 +21,23 @@ const STATIC_ASSETS = [
   '/paynews/pet-assets/mood_daze.png',
 ];
 
-// 安装：预缓存静态资源
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS))
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(STATIC_ASSETS).catch(err => {
+        console.warn('预缓存部分资源失败（已忽略，不影响安装）:', err);
+      }))
   );
-  self.skipWaiting();
+  self.skipWaiting(); // 立即激活，不等旧页面关闭
 });
 
-// 激活：清理旧缓存，并强制所有已打开页面用新 SW 重新加载（打破旧缓存死锁）
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
+    // 删除所有旧缓存（v1~v5），彻底清掉可能残留的旧 index.html
     const keys = await caches.keys();
     await Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)));
     await self.clients.claim();
+    // 强制所有已打开页面用新 SW 重新加载，打破旧缓存死锁
     const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     for (const c of clients) {
       try { await c.navigate(c.url); } catch (e) { /* ignore */ }
@@ -45,29 +45,29 @@ self.addEventListener('activate', event => {
   })());
 });
 
-// 请求拦截
 self.addEventListener('fetch', event => {
-  if (event.request.method !== 'GET') return;
-  // 跳过 Supabase API 请求（保持实时性）
-  if (event.request.url.includes('supabase.co')) return;
-  // 导航请求（HTML页面）永远走网络、不缓存，确保用户始终拿到最新 index.html
-  if (event.request.mode === 'navigate') {
-    event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+  const req = event.request;
+  if (req.method !== 'GET') return;                 // 非 GET（含登录 POST）直接放行
+  if (req.url.includes('supabase.co')) return;       // Supabase API 实时，不缓存
+  // 导航请求（HTML 页面）永远走网络、不缓存，确保始终拿到最新 index.html
+  if (req.mode === 'navigate') {
+    event.respondWith(fetch(req).catch(() => caches.match('/paynews/index.html')));
     return;
   }
-  // 静态资源：网络优先，失败时回退缓存
+  // 静态资源：网络优先，成功则写入缓存；失败时回退缓存
   event.respondWith(
-    fetch(event.request)
+    fetch(req)
       .then(response => {
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        if (response && response.status === 200) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(req, clone));
+        }
         return response;
       })
-      .catch(() => caches.match(event.request))
+      .catch(() => caches.match(req))
   );
 });
 
-// 接收主页面消息并显示通知
 self.addEventListener('message', event => {
   if (event.data && event.data.type === 'NEW_MESSAGE_NOTIFY') {
     const { title, body } = event.data;
@@ -82,16 +82,12 @@ self.addEventListener('message', event => {
   }
 });
 
-// 点击通知回到 PWA
 self.addEventListener('notificationclick', event => {
   event.notification.close();
   event.waitUntil(
     clients.matchAll({ type: 'window' }).then(clients => {
-      if (clients.length > 0) {
-        clients[0].focus();
-      } else {
-        clients.openWindow('/paynews/');
-      }
+      if (clients.length > 0) clients[0].focus();
+      else clients.openWindow('/paynews/');
     })
   );
 });
