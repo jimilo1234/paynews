@@ -3576,27 +3576,17 @@ function petRealtime(){
 }
 
 async function initPetSystem(){
-  console.log('[Pet] initPetSystem 调用，petInited='+petInited);
   if(petInited)return;
   petInited=true;
-  console.log('[Pet] 开始渲染...');
+  var catImg=document.getElementById('pet-cat');
+  // 如果DOM还没解析到宠物tab，先不标记为已初始化，等tab点击再试
+  if(!catImg){petInited=false;return;}
   try{
-    var grid=document.getElementById('pet-grid');
-    console.log('[Pet] pet-grid元素:',grid);
-    // 先渲染猫和按钮，不依赖Supabase
-    console.log('[Pet] 调用petRenderBtns...');
     petRenderBtns();
-    console.log('[Pet] 调用petUpdateRefSelect...');
     petUpdateRefSelect();
-    console.log('[Pet] 调用render...');
     render();
-    console.log('[Pet] 渲染完成');
   }catch(e){
-    console.error('[Pet] 渲染错误:',e);
-    var grid=document.getElementById('pet-grid');
-    if(grid){
-      grid.innerHTML='<div style="grid-column:1/-1;padding:20px;color:red;text-align:center;font-size:14px;">初始化失败: '+e.message+'<br>请刷新重试</div>';
-    }
+    console.error('宠物初始化错误:',e);
   }
   document.getElementById('pet-custom-type').addEventListener('change',petUpdateRefSelect);
   // Supabase数据加载（失败不影响显示）
@@ -3607,16 +3597,16 @@ async function initPetSystem(){
 }
 
 // tab 切换联动
-// 直接初始化，不依赖 DOMContentLoaded（避免缓存或时序问题）
-if(!petInited){
-  console.log('[Pet] 初始化宠物系统...');
-  initPetSystem();
-}
+document.addEventListener('DOMContentLoaded',function(){
+  if(!petInited)initPetSystem();
+});
 
 var petTabBtn=document.querySelector('[data-tab="tab-pet"]');
 if(petTabBtn){
   petTabBtn.addEventListener('click',function(){
-    if(!petInited)initPetSystem();
+    if(!petInited){initPetSystem();return;}
+    var catImg=document.getElementById('pet-cat');
+    if(catImg&&!catImg.src){render();}
   });
   var petObs=new MutationObserver(function(){
     var panel=document.getElementById('tab-pet');
