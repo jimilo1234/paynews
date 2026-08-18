@@ -1,4 +1,4 @@
-const CACHE_NAME = 'paynews-v1';
+const CACHE_NAME = 'paynews-v3';
 const STATIC_ASSETS = [
   '/paynews/',
   '/paynews/index.html',
