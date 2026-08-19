@@ -3917,11 +3917,21 @@ function render(){
   var moodImg=document.getElementById('pet-mood');
   var catKey=petCur.sr||'work';
   var moodKey=petCur.mr||'calm';
-  // 宠物图片走本地 pet-assets 目录（相对 index.html，?v=17 用于防缓存）
+  // 宠物图片走本地 pet-assets 目录（相对 index.html，?v=19 用于防缓存）
   var CAT_FILES={work:1,study:1,eat:1,exercise:1,sleep:1,listen:1};
   var MOOD_FILES={calm:1,happy:1,sad:1,angry:1,surprised:1,sleepy:1,excited:1,love:1,cry:1,daze:1};
-  if(catImg)catImg.src='pet-assets/cat_'+(CAT_FILES[catKey]?catKey:'work')+'.png?v=17';
-  if(moodImg)moodImg.src='pet-assets/mood_'+(MOOD_FILES[moodKey]?moodKey:'calm')+'.png?v=17';
+  var catName=(CAT_FILES[catKey]?catKey:'work');
+  var moodName=(MOOD_FILES[moodKey]?moodKey:'calm');
+  if(catImg){
+    catImg.src='pet-assets/cat_'+catName+'.png?v=19';
+    catImg.onerror=function(){this.src='pet-assets/cat_work.png?v=19';this.onerror=null;};
+    catImg.onload=function(){window.__petCatLoaded=true;};
+  }
+  if(moodImg){
+    moodImg.src='pet-assets/mood_'+moodName+'.png?v=19';
+    moodImg.onerror=function(){this.src='pet-assets/mood_calm.png?v=19';this.onerror=null;};
+  }
+  window.__petRendered=true;
   var statusText=document.getElementById('pet-status-text');
   if(statusText)statusText.textContent='小猫正在'+petCur.mn+'\u2026（'+petCur.sn+'中）';
 }
@@ -4214,15 +4224,21 @@ setInterval(async () => {
 <!-- 宠物图防缓存兜底：若 2s 内仍未加载，强制刷新一次（ bust ServiceWorker 旧缓存） -->
 <script>
 (function(){
-  if(location.search.indexOf('petnocache=')>-1) return; // 只重试一次，避免死循环
+  if(location.search.indexOf('petnocache=')>-1) return;
+  var _retries=0;
+  var _maxRetries=1;
   setTimeout(function(){
     var catImg=document.getElementById('pet-cat');
-    if(!catImg || !catImg.src){
-      console.warn('[StaleCheck] 宠物未加载，强制刷新...');
+    var ok=catImg&&catImg.src&&window.__petCatLoaded;
+    if(!ok&&_retries<_maxRetries){
+      _retries++;
+      console.warn('[StaleCheck] 宠物图片未加载，尝试刷新... ('+_retries+'/'+_maxRetries+')');
       var sep=location.search?'&':'?';
       location.href=location.href+sep+'petnocache='+Date.now();
+    }else if(!ok){
+      console.error('[StaleCheck] 宠物图片加载失败，已达到最大重试次数');
     }
-  }, 2000);
+  }, 3000);
 })();
 </script>
 
