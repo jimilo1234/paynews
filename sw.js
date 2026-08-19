@@ -1,6 +1,6 @@
-const CACHE_NAME = 'paynews-v8';
+const CACHE_NAME = 'paynews-v9';
 
-// v8: 不缓存任何应用资源，永远从网络取最新，彻底杜绝旧 index.html 死锁。
+// v9: 不缓存任何应用资源（v9 起宠物图为外置文件，SW 网络优先保证每次取最新），永远从网络取最新，彻底杜绝旧 index.html 死锁。
 self.addEventListener('install', event => { event.waitUntil(self.skipWaiting()); });
 
 self.addEventListener('activate', event => {
