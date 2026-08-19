@@ -1,6 +1,6 @@
-const CACHE_NAME = 'paynews-v11';
+const CACHE_NAME = 'paynews-v12';
 
-// v11: 不缓存任何资源；删除所有旧缓存；install 后立即激活并强制刷新页面
+// v12: 不缓存任何资源；删除所有旧缓存；install 后立即激活并强制刷新页面
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
