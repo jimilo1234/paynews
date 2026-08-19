@@ -934,7 +934,7 @@ let MOCK_NEWS = [
   { category: '支付公司', title: '万事达卡重大高层调整，CFO由亚太区总裁凌海接任', summary: '万事达卡宣布多项核心人事变动，CFO由亚太区总裁凌海接任，同时调整首席商务官、首席服务官及副董事长等岗位。变动将于8月3日生效。业内解读为万事达卡加速亚太市场布局，特别是中国跨境支付和数字人民币互联互通领域。' },
   { category: '支付公司', title: '央行批准联通支付增资至3亿元', summary: '联通支付获央行批准将注册资本从1.5亿元��至3亿元，这是今年第5家增资的持牌支付机构。支付机构增资是近年显著趋势，反映监管对资本充足率要求提高，也体现支付机构在业务扩张和合规成本上升背景下的资金需求。联通支付将重点布局通信场景支付和企业缴费。' },
   { category: '跨境支付', title: '渣打香港即将接入"跨境支付通"，香港三大发钞行全部入局', summary: '渣打银行香港分行宣布即将接入"跨境支付通"系统，至此香港三大发钞行（汇丰、中银、渣打）全部入局。目前共38家机构参与跨境支付通，香港24家、内地14家。系统支持港币与人民币实时兑换，单笔限额50万元，到账时间从T+1缩短至秒级。' },
-  { category: '跨境支付', title: '英国上线自主支付体系UKPI，打破美国卡组织垄断', summary: '由英国主流银行与金融科技企业联合组建的UKPI（United Kingdom Payment Infrastructure）正式上线，首日接入银行12家、商户8万家。UKPI采用分布式账本技术，交易成本较Visa/Mastercard降低40%，结算速度从T+1提升至实时。此举被视为欧洲支付自主化的重要一步。' },
+  { category: '跨境支付', title: '英国上线自主支付体系UKPI，打破美国卡组织垄断', summary: '由英国主流银行与金融科��企业联合组建的UKPI（United Kingdom Payment Infrastructure）正式上线，首日接入银行12家、商户8万家。UKPI采用分布式账本技术，交易成本较Visa/Mastercard降低40%，结算速度从T+1提升至实时。此举被视为欧洲支付自主化的重要一步。' },
   { category: '技术趋势', title: '扫码支付占比从峰值95%下滑至90%，生物识别+AI支付一年增长3倍', summary: '中国移动支付市场格局出现结构性��化，扫码支付市场份额首次出现连续下滑。AI付、碰一碰、刷掌支付快速崛起，新支付方式交易笔数一年增长3倍，占比从2%升至8%。预计2028年新支付占比将突破50%，支付行业将迎来近十年来最大技术代际更替。' },
 ];
 
@@ -3454,8 +3454,8 @@ function render(){
   // 图片走 Supabase Storage 公开 URL（cache-control=no-cache，改图即时生效）
   var CAT_FILES={work:1,study:1,eat:1,exercise:1,sleep:1,listen:1};
   var MOOD_FILES={calm:1,happy:1,sad:1,angry:1,surprised:1,sleepy:1,excited:1,love:1,cry:1,daze:1};
-  if(catImg)catImg.src='https://wwxzycfdfyyljkjfcbjt.supabase.co/storage/v1/object/public/pet-assets/cat_'+(CAT_FILES[catKey]?catKey:'work')+'.png?v=11';
-  if(moodImg)moodImg.src='https://wwxzycfdfyyljkjfcbjt.supabase.co/storage/v1/object/public/pet-assets/mood_'+(MOOD_FILES[moodKey]?moodKey:'calm')+'.png?v=11';
+  if(catImg)catImg.src='/paynews/pet-assets/cat_'+(CAT_FILES[catKey]?catKey:'work')+'.png?v=12';
+  if(moodImg)moodImg.src='/paynews/pet-assets/mood_'+(MOOD_FILES[moodKey]?moodKey:'calm')+'.png?v=12';
   var statusText=document.getElementById('pet-status-text');
   if(statusText)statusText.textContent='小猫正在'+petCur.mn+'\u2026（'+petCur.sn+'中）';
 }
@@ -3705,7 +3705,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange',function(){
     if(!_swReloaded){_swReloaded=true;location.reload();}
   });
-  navigator.serviceWorker.register('/paynews/sw.js?v=11').then(() => {
+  navigator.serviceWorker.register('/paynews/sw.js?v=12').then(() => {
     console.log('[PWA] Service Worker 已注册');
     // 首次安装后请求通知权限
     if ('Notification' in window && Notification.permission === 'default') {
