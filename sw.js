@@ -1,4 +1,4 @@
-const CACHE_NAME = 'paynews-v16';
+const CACHE_NAME = 'paynews-v17';
 
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
