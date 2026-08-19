@@ -14,8 +14,17 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="支付新闻">
   <link rel="apple-touch-icon" href="/paynews/icon-192.png">
+  <link rel="preconnect" href="https://fonts.font.im" crossorigin>
+  <link href="https://fonts.font.im/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
+
+html {
+  font-family: 'Noto Sans SC', system-ui, -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", sans-serif;
+}
+button, input, textarea, select {
+  font-family: inherit;
+}
 
 :root {
   --bg-dark: #0d0d0d;
@@ -61,7 +70,7 @@ html.light {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", sans-serif;
+  font-family: 'Noto Sans SC', system-ui, -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", sans-serif;
   background: var(--bg-dark);
   color: var(--text);
   min-height: 100vh;
@@ -378,7 +387,7 @@ html.light .guest-id.broadcasting { color: #222; }
   background: var(--accent); color: #fff; font-size: 13px;
   font-weight: 600; cursor: pointer; transition: background 0.2s;
   white-space: nowrap; flex-shrink: 0;
-  font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Noto Sans CJK SC", sans-serif;
+  font-family: 'Noto Sans SC', system-ui, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
 }
 .input-col .send-btn:hover { background: #7c6cf7; }
 .input-col .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -3455,8 +3464,8 @@ function render(){
   // 图片走 Supabase Storage 公开 URL（cache-control=no-cache，改图即时生效）
   var CAT_FILES={work:1,study:1,eat:1,exercise:1,sleep:1,listen:1};
   var MOOD_FILES={calm:1,happy:1,sad:1,angry:1,surprised:1,sleepy:1,excited:1,love:1,cry:1,daze:1};
-  if(catImg)catImg.src='/paynews/pet-assets/cat_'+(CAT_FILES[catKey]?catKey:'work')+'.png?v=14';
-  if(moodImg)moodImg.src='/paynews/pet-assets/mood_'+(MOOD_FILES[moodKey]?moodKey:'calm')+'.png?v=14';
+  if(catImg)catImg.src='/paynews/pet-assets/cat_'+(CAT_FILES[catKey]?catKey:'work')+'.png?v=15';
+  if(moodImg)moodImg.src='/paynews/pet-assets/mood_'+(MOOD_FILES[moodKey]?moodKey:'calm')+'.png?v=15';
   var statusText=document.getElementById('pet-status-text');
   if(statusText)statusText.textContent='小猫正在'+petCur.mn+'\u2026（'+petCur.sn+'中）';
 }
@@ -3706,7 +3715,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange',function(){
     if(!_swReloaded){_swReloaded=true;location.reload();}
   });
-  navigator.serviceWorker.register('/paynews/sw.js?v=14').then(() => {
+  navigator.serviceWorker.register('/paynews/sw.js?v=15').then(() => {
     console.log('[PWA] Service Worker 已注册');
     // 首次安装后请求通知权限
     if ('Notification' in window && Notification.permission === 'default') {
