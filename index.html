@@ -3451,11 +3451,11 @@ function render(){
   var moodImg=document.getElementById('pet-mood');
   var catKey=petCur.sr||'work';
   var moodKey=petCur.mr||'calm';
-  // 图片走文件路径（外置 pet-assets/ 目录），带 ?v=2 防浏览器 HTTP 缓存
+  // 图片走 Supabase Storage 公开 URL（cache-control=no-cache，改图即时生效）
   var CAT_FILES={work:1,study:1,eat:1,exercise:1,sleep:1,listen:1};
   var MOOD_FILES={calm:1,happy:1,sad:1,angry:1,surprised:1,sleepy:1,excited:1,love:1,cry:1,daze:1};
-  if(catImg)catImg.src='/paynews/pet-assets/cat_'+(CAT_FILES[catKey]?catKey:'work')+'.png?v=3';
-  if(moodImg)moodImg.src='/paynews/pet-assets/mood_'+(MOOD_FILES[moodKey]?moodKey:'calm')+'.png?v=3';
+  if(catImg)catImg.src='https://wwxzycfdfyyljkjfcbjt.supabase.co/storage/v1/object/public/pet-assets/cat_'+(CAT_FILES[catKey]?catKey:'work')+'.png';
+  if(moodImg)moodImg.src='https://wwxzycfdfyyljkjfcbjt.supabase.co/storage/v1/object/public/pet-assets/mood_'+(MOOD_FILES[moodKey]?moodKey:'calm')+'.png';
   var statusText=document.getElementById('pet-status-text');
   if(statusText)statusText.textContent='小猫正在'+petCur.mn+'\u2026（'+petCur.sn+'中）';
 }
