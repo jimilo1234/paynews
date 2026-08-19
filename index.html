@@ -3454,8 +3454,8 @@ function render(){
   // 图片走文件路径（外置 pet-assets/ 目录），带 ?v=2 防浏览器 HTTP 缓存
   var CAT_FILES={work:1,study:1,eat:1,exercise:1,sleep:1,listen:1};
   var MOOD_FILES={calm:1,happy:1,sad:1,angry:1,surprised:1,sleepy:1,excited:1,love:1,cry:1,daze:1};
-  if(catImg)catImg.src='/paynews/pet-assets/cat_'+(CAT_FILES[catKey]?catKey:'work')+'.png?v=2';
-  if(moodImg)moodImg.src='/paynews/pet-assets/mood_'+(MOOD_FILES[moodKey]?moodKey:'calm')+'.png?v=2';
+  if(catImg)catImg.src='/paynews/pet-assets/cat_'+(CAT_FILES[catKey]?catKey:'work')+'.png?v=3';
+  if(moodImg)moodImg.src='/paynews/pet-assets/mood_'+(MOOD_FILES[moodKey]?moodKey:'calm')+'.png?v=3';
   var statusText=document.getElementById('pet-status-text');
   if(statusText)statusText.textContent='小猫正在'+petCur.mn+'\u2026（'+petCur.sn+'中）';
 }
@@ -3705,7 +3705,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange',function(){
     if(!_swReloaded){_swReloaded=true;location.reload();}
   });
-  navigator.serviceWorker.register('/paynews/sw.js?v=9').then(() => {
+  navigator.serviceWorker.register('/paynews/sw.js?v=10').then(() => {
     console.log('[PWA] Service Worker 已注册');
     // 首次安装后请求通知权限
     if ('Notification' in window && Notification.permission === 'default') {
