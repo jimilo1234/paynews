@@ -707,7 +707,7 @@ html.light .guest-id.broadcasting { color: #222; }
             <label>留言</label>
             <input type="text" id="login-password" autocomplete="off">
           </div>
-          <button class="login-btn" id="login-btn">发布新闻</button>
+          <button class="login-btn" id="login-btn">发布���闻</button>
           <p class="login-error" id="login-error"></p>
         </div>
       </div>
@@ -916,26 +916,26 @@ window.addEventListener("message", function(event) {
 
 // ===== 静态新闻数据 =====
 let MOCK_NEWS = [
-  { category: '监管动态', title: '汇聚支付被罚没超452万元，已逐条落实整改', summary: '因违反支付结算管理规定，汇聚支付被央行广东分行罚没452.62万元。公司回应称已全部整改完毕并升级合规体系，包括重新梳理商户准入流程、强化交易监控能力、完善反洗钱内控机制等。业内分析认为，这是今年央行加大对收单机构违规行为处罚力度的一个缩影。' },
+  { category: '监管动态', title: '汇聚支付被罚没超452万元，已逐条落实整改', summary: '因违反支付结算管理规定，汇聚支付被央行广东分行罚没452.62万元。��司回应称已全部整改完毕并升级合规体系，包括重新梳理商户准入流程、强化交易监控能力、完善反洗钱内控机制等。业内分析认为，这是今年央行加大对收单机构违规行为处罚力度的一个缩影。' },
   { category: '监管动态', title: '收单外包3万家备案后进入下半场，推荐函不能再走形式', summary: '支付清算协会发布新通知，要求收单机构对外包机构尽调、聚合支付技术审核、本地化经营全面从严管理。此前行业内普遍存在的"推荐函走过场"现象将被重点整治，预计将有大量不符合要求的外包服务商被清退，收单市场格局面临重塑。' },
   { category: '监管动态', title: '杉德支付牌照续展申请被中止，6月24日将与广发对簿公堂', summary: '杉德支付因多项违规行为，牌照续展审查被中止审查，这是本月第二家支付机构遭遇类似情况。与此同时，杉德与广发银行之间的纠纷案将于6月24日开庭审理，涉及金额超2亿元。杉德支付此前已被列入经营异常名录，业务开展受限。' },
-  { category: '监管动态', title: '6月收款码规范化新规落地，精准区分个人与商用边界', summary: '央行新规明确个人收款码不得用于经营性收款，违者将面临处罚。新规要求各支付平台在6月底前完成商用码切换，并对已有个人码进行经营性使用识别。小微商户可免费申请商用收款码，费率维持不变。市场预计此举将影响约3000万个体经营者。' },
+  { category: '监管动态', title: '6月收款码规范化新规落地，精准区分个人与商用边界', summary: '央行新规明确个人收款码不得用于经营性收款，违者将面临处罚。新规要求各支付平���在6月底前完成商用码切换，并对已有个人码进行经营性使用识别。小微商户可免费申请商用收款码，费率维持不变。市场预计此举将影响约3000万个体经营者。' },
   { category: '监管动态', title: '微信零钱资金属性变更：不享受存款保险兜底', summary: '微信支付公告零钱不属于存款，不受存款保险条例保护，用户需关注资金安全。此次调整是对央行关于非银行支付机构备付金管理要求的响应。专家建议用户大额资金应转入银行存款账户，仅保留日常消费所需金额在零钱中。' },
   { category: '数字人民币', title: 'mBridge扩围：澳门首批3家银行完成23笔跨境交易', summary: '澳门金管局正式开通mBridge系统，首批3家银行已完成涵盖贸易结算、跨境汇款等业务，总交易金额达1.2亿澳门元。mBridge目前已有包括中国内地、香港、泰国、阿联酋等6个司法管辖区的中央银行参与，正在从实验阶段向生产级应用过渡。' },
   { category: '数字人民币', title: '上海发文构建数字人民币跨境金融基础设施体系', summary: '上海市发布《关于推进数字人民币跨境金融基础设施建设的实施方案》，鼓励机构接入mBridge，相关业务已覆盖贸易结算、航运保险、供应链金融等场景。方案提出到2027年实现数字人民币跨境交易规模突破千亿元的目标。' },
   { category: '数字人民币', title: '六大行宣布为数字人民币钱包余额计息，年利率0.35%', summary: '数字人民币从支付工具向储蓄工具跨越，工行、农行、中行、建行、交行、邮储六大行同步宣布为数字人民币钱包余额按0.35%年利率计息，按季结息。目前个人钱包开户数已达12亿，硬钱包发行量突破3亿，日均交易笔数超过8000万笔。' },
   { category: '数字人民币', title: '央行考虑建立数字人民币清算所，类似银联模式', summary: '旨在打通所有运营银行间数字人民币交易清算，提升跨行交易效率。目前数字人民币跨行清算依赖央行小额支付系统，处理能力和时效性存在瓶颈。新清算所可能采用公司化运营，引入市场化机制，该消息此前未被公开报道。' },
-  { category: '数字人民币', title: '数字人民币加速出海：与沙特65亿原油结算，东盟纳入区域支付系统', summary: '中东局势加速去美元化进程，中国与沙特完成首笔65亿元人民币原油贸易数字人民币结算。同时东盟十国财长会议同意将数字人民币纳入区域支付互联互通体系，预计2027年前实现与东盟五国的日常跨境支付。但海外对手方接受度仍是长期挑战。' },
+  { category: '数字人民币', title: '数字人民币加速出海：与沙特65亿原油结算，东盟纳入区域支付系统', summary: '中东局势加速去美元化进程，中国与沙特完成首笔65亿元人民币原油贸易数字人民币结算。同时东盟十国财长会议同意将数字人民币纳入区域支付互联互通体系，预计2027年前实现与东盟五国的日常跨境支付。但海外对手��接受度仍是长期挑战。' },
   { category: '支付公司', title: '拉卡拉Q1净利润暴增491%，扫码交易连续4季度增长', summary: '拉卡拉披露一季报，净利润达3.2亿元，同比增长491%，扫码交易规模同比增长35%，连续4个季度保持高增长。公司表示受益于线下消费复苏和中小微商户数字化转型需求，活跃商户数突破2800万，户均交易额同比提升22%。持续领跑线下收单市场。' },
   { category: '支付公司', title: '支付宝"碰一下"用户突破2亿，覆盖百万门店', summary: 'NFC碰一碰支付快速普及，用户数突破2亿，覆盖超过100万家门店。数据显示61%年轻人用一次就常用，复购率远超扫码支付。夏季消费节期间将发放亿元福利鼓励用户尝鲜。业内分析认为，NFC支付将逐步取代扫码成为线下主流支付方式。' },
   { category: '支付公司', title: '支付宝AI付累计完成超3亿笔，支持95%通用智能体框架', summary: '蚂蚁集团发布AI付、AI收、AI钱包、Token Pay四款产品，上线3个月累计完成超3亿笔交易，交易量翻近两倍。AI付支持95%的通用智能体框架，用户通过自然语言即可完成支付指令。蚂蚁还开放了AI支付API，已有超过2000家商户接入。' },
   { category: '支付公司', title: '微信支付上线AI支付接入体系，七成商户开发者已使用', summary: '微信支付发布AI支付接入体系，包含Skill技能包、AI友好文档和API三大模块，依托14亿微信用户生态和混元大模型深度协同。上线首月已有70%的商户开发者接入使用，覆盖餐饮、零售、出行等核心场景，交易成功率99.2%。' },
   { category: '支付公司', title: '字节豆包内测对话中下单支付，14亿收购联动优势补齐线下资质', summary: '用户在豆包对话中即可完成商品搜索、比价、下单和支付全流程，字节正将电商入口从抖音迁移至AI对话框。同时字节以14亿元完成收购联动优势，获得银行卡收单牌照，补齐线下支付资质短板。此举意味着字节支付版图从线上拓展至全场景。' },
   { category: '支付公司', title: '万事达卡重大高层调整，CFO由亚太区总裁凌海接任', summary: '万事达卡宣布多项核心人事变动，CFO由亚太区总裁凌海接任，同时调整首席商务官、首席服务官及副董事长等岗位。变动将于8月3日生效。业内解读为万事达卡加速亚太市场布局，特别是中国跨境支付和数字人民币互联互通领域。' },
-  { category: '支付公司', title: '央行批准联通支付增资至3亿元', summary: '联通支付获央行批准将注册资本从1.5亿元增至3亿元，这是今年第5家增资的持牌支付机构。支付机构增资是近年显著趋势，反映监管对资本充足率要求提高，也体现支付机构在业务扩张和合规成本上升背景下的资金需求。联通支付将重点布局通信场景支付和企业缴费。' },
+  { category: '支付公司', title: '央行批准联通支付增资至3亿元', summary: '联通支付获央行批准将注册资本从1.5亿元��至3亿元，这是今年第5家增资的持牌支付机构。支付机构增资是近年显著趋势，反映监管对资本充足率要求提高，也体现支付机构在业务扩张和合规成本上升背景下的资金需求。联通支付将重点布局通信场景支付和企业缴费。' },
   { category: '跨境支付', title: '渣打香港即将接入"跨境支付通"，香港三大发钞行全部入局', summary: '渣打银行香港分行宣布即将接入"跨境支付通"系统，至此香港三大发钞行（汇丰、中银、渣打）全部入局。目前共38家机构参与跨境支付通，香港24家、内地14家。系统支持港币与人民币实时兑换，单笔限额50万元，到账时间从T+1缩短至秒级。' },
   { category: '跨境支付', title: '英国上线自主支付体系UKPI，打破美国卡组织垄断', summary: '由英国主流银行与金融科技企业联合组建的UKPI（United Kingdom Payment Infrastructure）正式上线，首日接入银行12家、商户8万家。UKPI采用分布式账本技术，交易成本较Visa/Mastercard降低40%，结算速度从T+1提升至实时。此举被视为欧洲支付自主化的重要一步。' },
-  { category: '技术趋势', title: '扫码支付占比从峰值95%下滑至90%，生物识别+AI支付一年增长3倍', summary: '中国移动支付市场格局出现结构性变化，扫码支付市场份额首次出现连续下滑。AI付、碰一碰、刷掌支付快速崛起，新支付方式交易笔数一年增长3倍，占比从2%升至8%。预计2028年新支付占比将突破50%，支付行业将迎来近十年来最大技术代际更替。' },
+  { category: '技术趋势', title: '扫码支付占比从峰值95%下滑至90%，生物识别+AI支付一年增长3倍', summary: '中国移动支付市场格局出现结构性��化，扫码支付市场份额首次出现连续下滑。AI付、碰一碰、刷掌支付快速崛起，新支付方式交易笔数一年增长3倍，占比从2%升至8%。预计2028年新支付占比将突破50%，支付行业将迎来近十年来最大技术代际更替。' },
 ];
 
 // 从localStorage加载已保存的新闻数据（如果存在）
@@ -1068,7 +1068,7 @@ function renderNews(containerId, dateId, userMessages, isAutoRefresh) {
       );
       if (addedOtherMsgs.length > 0) {
         dateEl.classList.add('has-update');
-        document.title = '支付行业新闻1.0';
+        document.title = '���付行业新闻1.0';
         hasNewMessages = true;
       }
     }
@@ -3454,8 +3454,8 @@ function render(){
   // 图片走 Supabase Storage 公开 URL（cache-control=no-cache，改图即时生效）
   var CAT_FILES={work:1,study:1,eat:1,exercise:1,sleep:1,listen:1};
   var MOOD_FILES={calm:1,happy:1,sad:1,angry:1,surprised:1,sleepy:1,excited:1,love:1,cry:1,daze:1};
-  if(catImg)catImg.src='https://wwxzycfdfyyljkjfcbjt.supabase.co/storage/v1/object/public/pet-assets/cat_'+(CAT_FILES[catKey]?catKey:'work')+'.png';
-  if(moodImg)moodImg.src='https://wwxzycfdfyyljkjfcbjt.supabase.co/storage/v1/object/public/pet-assets/mood_'+(MOOD_FILES[moodKey]?moodKey:'calm')+'.png';
+  if(catImg)catImg.src='https://wwxzycfdfyyljkjfcbjt.supabase.co/storage/v1/object/public/pet-assets/cat_'+(CAT_FILES[catKey]?catKey:'work')+'.png?v=11';
+  if(moodImg)moodImg.src='https://wwxzycfdfyyljkjfcbjt.supabase.co/storage/v1/object/public/pet-assets/mood_'+(MOOD_FILES[moodKey]?moodKey:'calm')+'.png?v=11';
   var statusText=document.getElementById('pet-status-text');
   if(statusText)statusText.textContent='小猫正在'+petCur.mn+'\u2026（'+petCur.sn+'中）';
 }
@@ -3705,7 +3705,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange',function(){
     if(!_swReloaded){_swReloaded=true;location.reload();}
   });
-  navigator.serviceWorker.register('/paynews/sw.js?v=10').then(() => {
+  navigator.serviceWorker.register('/paynews/sw.js?v=11').then(() => {
     console.log('[PWA] Service Worker 已注册');
     // 首次安装后请求通知权限
     if ('Notification' in window && Notification.permission === 'default') {
