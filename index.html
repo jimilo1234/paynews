@@ -1134,6 +1134,12 @@ html.light .guest-id.broadcasting { color: #222; }
 .pet-mood{position:absolute;top:-4px;right:4px;width:66px;height:66px;image-rendering:pixelated;pointer-events:none;filter:drop-shadow(0 2px 5px rgba(0,0,0,.28));animation:petFloat 2.6s ease-in-out infinite}
 @keyframes petFloat{0%,100%{transform:translateY(0) rotate(-5deg)}50%{transform:translateY(-9px) rotate(5deg)}}
 .pet-status-text{font-size:15px;color:#333;margin-bottom:12px;min-height:22px}
+.pet-head-label{position:absolute;top:-36px;left:50%;transform:translateX(-50%);background:#fff;color:#333;font-size:13px;font-weight:600;padding:4px 12px;border-radius:14px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.15);border:1px solid #eee;max-width:190px;overflow:hidden;text-overflow:ellipsis}
+.pet-switch-section{margin-top:8px}
+.pet-switch-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:8px}
+.pet-field{display:flex;flex-direction:column;align-items:flex-start;gap:4px;font-size:12px;color:#666}
+.pet-select,.pet-other-input{padding:6px 8px;border:1px solid #ddd;border-radius:8px;font-size:13px;min-width:120px;box-sizing:border-box}
+.pet-apply{margin-top:4px}
 .pet-section{margin-bottom:14px}
 .pet-section-title{font-size:12px;color:#999;margin-bottom:6px;text-align:left}
 .pet-btn-row{display:flex;flex-wrap:wrap;gap:6px}
@@ -1231,8 +1237,9 @@ html.light .guest-id.broadcasting { color: #222; }
       <div class="tab-panel" id="tab-pet">
         <div class="pet-container">
                 <div class="pet-cat-wrap">
-        <img id="pet-cat" class="pet-cat" alt="像素猫" src="/paynews/pet-assets/cat_work.png?v=21" onerror="this.src='data:image/png;base64,'+_PET_IMG.cat_work;this.onerror=null;" />
-        <img id="pet-mood" class="pet-mood" alt="心情" src="/paynews/pet-assets/mood_calm.png?v=21" onerror="this.src='data:image/png;base64,'+_PET_IMG.mood_calm;this.onerror=null;" />
+        <div id="pet-head-label" class="pet-head-label"></div>
+        <img id="pet-cat" class="pet-cat" alt="像素猫" src="/paynews/pet-assets/cat_work.png?v=22" onerror="this.src='data:image/png;base64,'+_PET_IMG.cat_work;this.onerror=null;" />
+        <img id="pet-mood" class="pet-mood" alt="心情" src="/paynews/pet-assets/mood_calm.png?v=22" onerror="this.src='data:image/png;base64,'+_PET_IMG.mood_calm;this.onerror=null;" />
       </div>
           <div class="pet-status-text" id="pet-status-text">小猫正在发呆...</div>
           <div class="pet-section">
@@ -1242,6 +1249,20 @@ html.light .guest-id.broadcasting { color: #222; }
           <div class="pet-section">
             <div class="pet-section-title">💖 心情</div>
             <div class="pet-btn-row" id="pet-mood-btns"></div>
+          </div>
+          <div class="pet-section pet-switch-section">
+            <div class="pet-section-title">🎛️ 切换状态 / 心情</div>
+            <div class="pet-switch-row">
+              <label class="pet-field"><span>状态</span>
+                <select id="pet-state-select" class="pet-select"></select>
+                <input id="pet-state-other" class="pet-other-input" placeholder="请输入状态" maxlength="12" style="display:none" />
+              </label>
+              <label class="pet-field"><span>心情</span>
+                <select id="pet-mood-select" class="pet-select"></select>
+                <input id="pet-mood-other" class="pet-other-input" placeholder="请输入心情" maxlength="12" style="display:none" />
+              </label>
+            </div>
+            <button id="pet-apply-btn" class="pet-btn pet-apply">提交生效</button>
           </div>
           <div class="pet-section">
             <div class="pet-section-title">✨ 自定义</div>
@@ -3920,14 +3941,16 @@ var _PET_IMG={
 function render(){
   var catImg=document.getElementById('pet-cat');
   var moodImg=document.getElementById('pet-mood');
-  // 优先走同域文件（兼容微信/扣子等 webview），失败再回退 base64
+  // 根据当前状态/心情切换对应图片，预设项有对应图，自定义兜底
+  var catRef=(petCur&&petCur.sr&&petCur.sr!=='__custom__')?petCur.sr:'work';
+  var moodRef=(petCur&&petCur.mr&&petCur.mr!=='__custom__')?petCur.mr:'calm';
   if(catImg){
     catImg.onerror=function(){this.src='data:image/png;base64,'+_PET_IMG.cat_work;this.onerror=null;};
-    catImg.src='/paynews/pet-assets/cat_work.png?v=21';
+    catImg.src='/paynews/pet-assets/cat_'+catRef+'.png?v=22';
   }
   if(moodImg){
     moodImg.onerror=function(){this.src='data:image/png;base64,'+_PET_IMG.mood_calm;this.onerror=null;};
-    moodImg.src='/paynews/pet-assets/mood_calm.png?v=21';
+    moodImg.src='/paynews/pet-assets/mood_'+moodRef+'.png?v=22';
   }
   window.__petRendered=true;
   window.__petCatLoaded=true;
@@ -3977,6 +4000,54 @@ function petRenderBtns(){
     b.appendChild(del);
     b.onclick=function(){petChange('mood',it.r,it.n)};
     mb.appendChild(b);
+  });
+}
+
+var _petSwitchInited=false;
+function initPetSwitch(){
+  if(_petSwitchInited)return;_petSwitchInited=true;
+  var ss=document.getElementById('pet-state-select');
+  var ms=document.getElementById('pet-mood-select');
+  var so=document.getElementById('pet-state-other');
+  var mo=document.getElementById('pet-mood-other');
+  var apply=document.getElementById('pet-apply-btn');
+  var label=document.getElementById('pet-head-label');
+  if(!ss||!ms||!apply)return;
+  function fill(sel,meta){
+    sel.innerHTML='';
+    meta.forEach(function(it){
+      var o=document.createElement('option');o.value=it.r;o.textContent=it.n;sel.appendChild(o);
+    });
+    var o=document.createElement('option');o.value='__other__';o.textContent='其他';sel.appendChild(o);
+  }
+  fill(ss,STATUS_META);fill(ms,MOOD_META);
+  function bindOther(sel,other){
+    sel.addEventListener('change',function(){
+      other.style.display=(sel.value==='__other__')?'block':'none';
+      if(sel.value!=='__other__')other.value='';
+    });
+  }
+  bindOther(ss,so);bindOther(ms,mo);
+  function pick(sel,other,meta){
+    if(sel.value==='__other__')return other.value.trim();
+    for(var i=0;i<meta.length;i++){if(meta[i].r===sel.value)return meta[i].n;}
+    return sel.options[sel.selectedIndex]?sel.options[sel.selectedIndex].text:'';
+  }
+  apply.addEventListener('click',function(){
+    var st=pick(ss,so,STATUS_META);
+    var md=pick(ms,mo,MOOD_META);
+    if(ss.value==='__other__'&&!st){so.focus();return;}
+    if(ms.value==='__other__'&&!md){mo.focus();return;}
+    petCur=petCur||{};
+    petCur.sr=(ss.value==='__other__')?'__custom__':ss.value;
+    petCur.sn=st;
+    petCur.mr=(ms.value==='__other__')?'__custom__':ms.value;
+    petCur.mn=md;
+    if(label)label.textContent=(st||'状态')+' · '+(md||'心情');
+    var stx=document.getElementById('pet-status-text');
+    if(stx)stx.textContent='小猫正在'+st+'…（'+md+'）';
+    render();petRenderBtns();
+    try{ if(supabaseClient){supabaseClient.from('pet_state').update({status_ref:petCur.sr,status_name:petCur.sn,mood_ref:petCur.mr,mood_name:petCur.mn}).eq('id',1);} }catch(e){}
   });
 }
 
@@ -4078,6 +4149,7 @@ async function initPetSystem(){
   try{
     petRenderBtns();
     petUpdateRefSelect();
+    initPetSwitch();
   }catch(e){
     console.error('宠物按钮初始化错误:',e);
   }
@@ -4180,7 +4252,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange',function(){
     if(!_swReloaded){_swReloaded=true;location.reload();}
   });
-  navigator.serviceWorker.register('/paynews/sw.js?v=21').then(() => {
+  navigator.serviceWorker.register('/paynews/sw.js?v=22').then(() => {
     console.log('[PWA] Service Worker 已注册');
     // 首次安装后请求通知权限
     if ('Notification' in window && Notification.permission === 'default') {
