@@ -1231,8 +1231,8 @@ html.light .guest-id.broadcasting { color: #222; }
       <div class="tab-panel" id="tab-pet">
         <div class="pet-container">
                 <div class="pet-cat-wrap">
-        <img id="pet-cat" class="pet-cat" alt="像素猫" />
-        <img id="pet-mood" class="pet-mood" alt="心情" />
+        <img id="pet-cat" class="pet-cat" alt="像素猫" src="/paynews/pet-assets/cat_work.png?v=21" onerror="this.src='data:image/png;base64,'+_PET_IMG.cat_work;this.onerror=null;" />
+        <img id="pet-mood" class="pet-mood" alt="心情" src="/paynews/pet-assets/mood_calm.png?v=21" onerror="this.src='data:image/png;base64,'+_PET_IMG.mood_calm;this.onerror=null;" />
       </div>
           <div class="pet-status-text" id="pet-status-text">小猫正在发呆...</div>
           <div class="pet-section">
@@ -3920,11 +3920,17 @@ var _PET_IMG={
 function render(){
   var catImg=document.getElementById('pet-cat');
   var moodImg=document.getElementById('pet-mood');
-  // 直接用内联 base64 data URI（零网络依赖，100%可显示）
-  if(catImg)catImg.src='data:image/png;base64,'+_PET_IMG.cat_work;
-  if(moodImg)moodImg.src='data:image/png;base64,'+_PET_IMG.mood_calm;
+  // 优先走同域文件（兼容微信/扣子等 webview），失败再回退 base64
+  if(catImg){
+    catImg.onerror=function(){this.src='data:image/png;base64,'+_PET_IMG.cat_work;this.onerror=null;};
+    catImg.src='/paynews/pet-assets/cat_work.png?v=21';
+  }
+  if(moodImg){
+    moodImg.onerror=function(){this.src='data:image/png;base64,'+_PET_IMG.mood_calm;this.onerror=null;};
+    moodImg.src='/paynews/pet-assets/mood_calm.png?v=21';
+  }
   window.__petRendered=true;
-  window.__petCatLoaded=true;  // 内联图不需要加载事件，直接标记完成
+  window.__petCatLoaded=true;
   var statusText=document.getElementById('pet-status-text');
   if(statusText)statusText.textContent='小猫正在'+(petCur?petCur.mn:'工作')+'\u2026（'+(petCur?petCur.sn:'工作中')+'）';
 }
@@ -4174,7 +4180,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange',function(){
     if(!_swReloaded){_swReloaded=true;location.reload();}
   });
-  navigator.serviceWorker.register('/paynews/sw.js?v=17').then(() => {
+  navigator.serviceWorker.register('/paynews/sw.js?v=21').then(() => {
     console.log('[PWA] Service Worker 已注册');
     // 首次安装后请求通知权限
     if ('Notification' in window && Notification.permission === 'default') {
