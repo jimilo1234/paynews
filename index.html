@@ -1238,8 +1238,8 @@ html.light .guest-id.broadcasting { color: #222; }
         <div class="pet-container">
                 <div class="pet-cat-wrap">
         <div id="pet-head-label" class="pet-head-label"></div>
-        <img id="pet-cat" class="pet-cat" alt="像素猫" src="/paynews/pet-assets/cat_work.png?v=22" onerror="this.src='data:image/png;base64,'+_PET_IMG.cat_work;this.onerror=null;" />
-        <img id="pet-mood" class="pet-mood" alt="心情" src="/paynews/pet-assets/mood_calm.png?v=22" onerror="this.src='data:image/png;base64,'+_PET_IMG.mood_calm;this.onerror=null;" />
+        <img id="pet-cat" class="pet-cat" alt="像素猫" src="/paynews/pet-assets/cat_work.png?v=23" onerror="this.src='data:image/png;base64,'+_PET_IMG.cat_work;this.onerror=null;" />
+        <img id="pet-mood" class="pet-mood" alt="心情" src="/paynews/pet-assets/mood_calm.png?v=23" onerror="this.src='data:image/png;base64,'+_PET_IMG.mood_calm;this.onerror=null;" />
       </div>
           <div class="pet-status-text" id="pet-status-text">小猫正在发呆...</div>
           <div class="pet-section">
@@ -1254,27 +1254,19 @@ html.light .guest-id.broadcasting { color: #222; }
             <div class="pet-section-title">🎛️ 切换状态 / 心情</div>
             <div class="pet-switch-row">
               <label class="pet-field"><span>状态</span>
-                <select id="pet-state-select" class="pet-select"></select>
+                <select id="pet-state-select" class="pet-select">
+                  <option value="" disabled selected>请选择状态</option>
+                </select>
                 <input id="pet-state-other" class="pet-other-input" placeholder="请输入状态" maxlength="12" style="display:none" />
               </label>
               <label class="pet-field"><span>心情</span>
-                <select id="pet-mood-select" class="pet-select"></select>
+                <select id="pet-mood-select" class="pet-select">
+                  <option value="" disabled selected>请选择心情</option>
+                </select>
                 <input id="pet-mood-other" class="pet-other-input" placeholder="请输入心情" maxlength="12" style="display:none" />
               </label>
             </div>
             <button id="pet-apply-btn" class="pet-btn pet-apply">提交生效</button>
-          </div>
-          <div class="pet-section">
-            <div class="pet-section-title">✨ 自定义</div>
-            <div class="pet-custom-add">
-              <select id="pet-custom-type">
-                <option value="status">状态</option>
-                <option value="mood">心情</option>
-              </select>
-              <input id="pet-custom-name" placeholder="名称" maxlength="8" />
-              <select id="pet-custom-ref"></select>
-              <button class="pet-btn" onclick="petAddCustom()">添加</button>
-            </div>
           </div>
           <div class="pet-hint">🐱 全站共养一只猫，实时同步</div>
         </div>
@@ -3946,11 +3938,11 @@ function render(){
   var moodRef=(petCur&&petCur.mr&&petCur.mr!=='__custom__')?petCur.mr:'calm';
   if(catImg){
     catImg.onerror=function(){this.src='data:image/png;base64,'+_PET_IMG.cat_work;this.onerror=null;};
-    catImg.src='/paynews/pet-assets/cat_'+catRef+'.png?v=22';
+    catImg.src='/paynews/pet-assets/cat_'+catRef+'.png?v=23';
   }
   if(moodImg){
     moodImg.onerror=function(){this.src='data:image/png;base64,'+_PET_IMG.mood_calm;this.onerror=null;};
-    moodImg.src='/paynews/pet-assets/mood_'+moodRef+'.png?v=22';
+    moodImg.src='/paynews/pet-assets/mood_'+moodRef+'.png?v=23';
   }
   window.__petRendered=true;
   window.__petCatLoaded=true;
@@ -4014,7 +4006,7 @@ function initPetSwitch(){
   var label=document.getElementById('pet-head-label');
   if(!ss||!ms||!apply)return;
   function fill(sel,meta){
-    sel.innerHTML='';
+    // 保留 HTML 中的占位 option，仅追加真实选项
     meta.forEach(function(it){
       var o=document.createElement('option');o.value=it.r;o.textContent=it.n;sel.appendChild(o);
     });
@@ -4034,6 +4026,8 @@ function initPetSwitch(){
     return sel.options[sel.selectedIndex]?sel.options[sel.selectedIndex].text:'';
   }
   apply.addEventListener('click',function(){
+    if(!ss.value){ss.focus();return;}
+    if(!ms.value){ms.focus();return;}
     var st=pick(ss,so,STATUS_META);
     var md=pick(ms,mo,MOOD_META);
     if(ss.value==='__other__'&&!st){so.focus();return;}
@@ -4252,7 +4246,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange',function(){
     if(!_swReloaded){_swReloaded=true;location.reload();}
   });
-  navigator.serviceWorker.register('/paynews/sw.js?v=22').then(() => {
+  navigator.serviceWorker.register('/paynews/sw.js?v=23').then(() => {
     console.log('[PWA] Service Worker 已注册');
     // 首次安装后请求通知权限
     if ('Notification' in window && Notification.permission === 'default') {
