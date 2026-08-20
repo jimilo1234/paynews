@@ -1,4 +1,4 @@
-const CACHE_NAME = 'paynews-v24';
+const CACHE_NAME = 'paynews-v25';
 
 // 安装：预缓存核心文件（小体积），字体/图片在首次 fetch 时自动进缓存
 self.addEventListener('install', event => {

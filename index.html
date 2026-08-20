@@ -1238,8 +1238,8 @@ html.light .guest-id.broadcasting { color: #222; }
         <div class="pet-container">
                 <div class="pet-cat-wrap">
         <div id="pet-head-label" class="pet-head-label"></div>
-        <img id="pet-cat" class="pet-cat" alt="像素猫" src="/paynews/pet-assets/cat_work.png?v=24" onerror="this.src='data:image/png;base64,'+_PET_IMG.cat_work;this.onerror=null;" />
-        <img id="pet-mood" class="pet-mood" alt="心情" src="/paynews/pet-assets/mood_calm.png?v=24" onerror="this.src='data:image/png;base64,'+_PET_IMG.mood_calm;this.onerror=null;" />
+        <img id="pet-cat" class="pet-cat" alt="像素猫" src="/paynews/pet-assets/cat_work.png?v=25" onerror="this.src='data:image/png;base64,'+_PET_IMG.cat_work;this.onerror=null;" />
+        <img id="pet-mood" class="pet-mood" alt="心情" src="/paynews/pet-assets/mood_calm.png?v=25" onerror="this.src='data:image/png;base64,'+_PET_IMG.mood_calm;this.onerror=null;" />
       </div>
           <div class="pet-status-text" id="pet-status-text">小猫正在发呆...</div>
           <div class="pet-section">
@@ -1254,7 +1254,7 @@ html.light .guest-id.broadcasting { color: #222; }
             <div class="pet-section-title">🎛️ 切换状态 / 心情</div>
             <div class="pet-switch-row">
               <label class="pet-field"><span>状态</span>
-                <select id="pet-state-select" class="pet-select">
+                <select id="pet-state-select" class="pet-select" onchange="petToggleOther('state',this.value)">
                   <option value="" disabled selected>请选择状态</option>
                   <option value="work">工作</option>
                   <option value="study">学习</option>
@@ -1267,7 +1267,7 @@ html.light .guest-id.broadcasting { color: #222; }
                 <input id="pet-state-other" class="pet-other-input" placeholder="请输入状态" maxlength="12" style="display:none" />
               </label>
               <label class="pet-field"><span>心情</span>
-                <select id="pet-mood-select" class="pet-select">
+                <select id="pet-mood-select" class="pet-select" onchange="petToggleOther('mood',this.value)">
                   <option value="" disabled selected>请选择心情</option>
                   <option value="calm">发呆</option>
                   <option value="happy">开心</option>
@@ -1284,7 +1284,7 @@ html.light .guest-id.broadcasting { color: #222; }
                 <input id="pet-mood-other" class="pet-other-input" placeholder="请输入心情" maxlength="12" style="display:none" />
               </label>
             </div>
-            <button id="pet-apply-btn" class="pet-btn pet-apply">提交生效</button>
+            <button id="pet-apply-btn" class="pet-btn pet-apply" type="button" onclick="petApply()">提交生效</button>
           </div>
           <div class="pet-hint">🐱 全站共养一只猫，实时同步</div>
         </div>
@@ -3956,11 +3956,11 @@ function render(){
   var moodRef=(petCur&&petCur.mr&&petCur.mr!=='__custom__')?petCur.mr:'calm';
   if(catImg){
     catImg.onerror=function(){this.src='data:image/png;base64,'+_PET_IMG.cat_work;this.onerror=null;};
-    catImg.src='/paynews/pet-assets/cat_'+catRef+'.png?v=24';
+    catImg.src='/paynews/pet-assets/cat_'+catRef+'.png?v=25';
   }
   if(moodImg){
     moodImg.onerror=function(){this.src='data:image/png;base64,'+_PET_IMG.mood_calm;this.onerror=null;};
-    moodImg.src='/paynews/pet-assets/mood_'+moodRef+'.png?v=24';
+    moodImg.src='/paynews/pet-assets/mood_'+moodRef+'.png?v=25';
   }
   window.__petRendered=true;
   window.__petCatLoaded=true;
@@ -4013,53 +4013,60 @@ function petRenderBtns(){
   });
 }
 
+function petPick(sel,other,meta){
+  if(sel.value==='__other__')return other.value.trim();
+  for(var i=0;i<meta.length;i++){if(meta[i].r===sel.value)return meta[i].n;}
+  return sel.options[sel.selectedIndex]?sel.options[sel.selectedIndex].text:'';
+}
+function petToggleOther(type,val){
+  var other=document.getElementById('pet-'+type+'-other');
+  if(!other)return;
+  other.style.display=(val==='__other__')?'block':'none';
+  if(val!=='__other__')other.value='';
+}
+function petApply(){
+  var ss=document.getElementById('pet-state-select');
+  var ms=document.getElementById('pet-mood-select');
+  var so=document.getElementById('pet-state-other');
+  var mo=document.getElementById('pet-mood-other');
+  var label=document.getElementById('pet-head-label');
+  if(!ss||!ms)return;
+  if(!ss.value){ss.focus();return;}
+  if(!ms.value){ms.focus();return;}
+  var st=petPick(ss,so,STATUS_META);
+  var md=petPick(ms,mo,MOOD_META);
+  if(ss.value==='__other__'&&!st){so.focus();return;}
+  if(ms.value==='__other__'&&!md){mo.focus();return;}
+  petCur=petCur||{};
+  petCur.sr=(ss.value==='__other__')?'__custom__':ss.value;
+  petCur.sn=st;
+  petCur.mr=(ms.value==='__other__')?'__custom__':ms.value;
+  petCur.mn=md;
+  if(label)label.textContent=(st||'状态')+' · '+(md||'心情');
+  var stx=document.getElementById('pet-status-text');
+  if(stx)stx.textContent='小猫正在'+st+'…（'+md+'）';
+  render();petRenderBtns();
+  try{ if(supabaseClient){supabaseClient.from('pet_state').update({status_ref:petCur.sr,status_name:petCur.sn,mood_ref:petCur.mr,mood_name:petCur.mn}).eq('id',1);} }catch(e){}
+}
+
 var _petSwitchInited=false;
 function initPetSwitch(){
   if(_petSwitchInited)return;_petSwitchInited=true;
   var ss=document.getElementById('pet-state-select');
   var ms=document.getElementById('pet-mood-select');
-  var so=document.getElementById('pet-state-other');
-  var mo=document.getElementById('pet-mood-other');
   var apply=document.getElementById('pet-apply-btn');
-  var label=document.getElementById('pet-head-label');
   if(!ss||!ms||!apply)return;
-  function bindOther(sel,other){
-    sel.addEventListener('change',function(){
-      other.style.display=(sel.value==='__other__')?'block':'none';
-      if(sel.value!=='__other__')other.value='';
-    });
-  }
-  bindOther(ss,so);bindOther(ms,mo);
-  function pick(sel,other,meta){
-    if(sel.value==='__other__')return other.value.trim();
-    for(var i=0;i<meta.length;i++){if(meta[i].r===sel.value)return meta[i].n;}
-    return sel.options[sel.selectedIndex]?sel.options[sel.selectedIndex].text:'';
-  }
-  apply.addEventListener('click',function(){
-    if(!ss.value){ss.focus();return;}
-    if(!ms.value){ms.focus();return;}
-    var st=pick(ss,so,STATUS_META);
-    var md=pick(ms,mo,MOOD_META);
-    if(ss.value==='__other__'&&!st){so.focus();return;}
-    if(ms.value==='__other__'&&!md){mo.focus();return;}
-    petCur=petCur||{};
-    petCur.sr=(ss.value==='__other__')?'__custom__':ss.value;
-    petCur.sn=st;
-    petCur.mr=(ms.value==='__other__')?'__custom__':ms.value;
-    petCur.mn=md;
-    if(label)label.textContent=(st||'状态')+' · '+(md||'心情');
-    var stx=document.getElementById('pet-status-text');
-    if(stx)stx.textContent='小猫正在'+st+'…（'+md+'）';
-    render();petRenderBtns();
-    try{ if(supabaseClient){supabaseClient.from('pet_state').update({status_ref:petCur.sr,status_name:petCur.sn,mood_ref:petCur.mr,mood_name:petCur.mn}).eq('id',1);} }catch(e){}
-  });
+  ss.addEventListener('change',function(){petToggleOther('state',this.value);});
+  ms.addEventListener('change',function(){petToggleOther('mood',this.value);});
+  apply.addEventListener('click',petApply);
 }
 
 function petUpdateRefSelect(){
   var sel=document.getElementById('pet-custom-ref');
-  if(!sel)return;sel.innerHTML='';
-  var t=document.getElementById('pet-custom-type').value;
-  var items=t==='status'?STATUS_META:MOOD_META;
+  var t=document.getElementById('pet-custom-type');
+  if(!sel||!t)return;
+  sel.innerHTML='';
+  var items=t.value==='status'?STATUS_META:MOOD_META;
   items.forEach(function(it){
     var o=document.createElement('option');o.value=it.r;o.textContent=it.n;
     sel.appendChild(o);
@@ -4157,7 +4164,8 @@ async function initPetSystem(){
   }catch(e){
     console.error('宠物按钮初始化错误:',e);
   }
-  document.getElementById('pet-custom-type').addEventListener('change',petUpdateRefSelect);
+  var pct=document.getElementById('pet-custom-type');
+  if(pct)pct.addEventListener('change',petUpdateRefSelect);
   // Supabase数据加载（失败不影响显示）
   if(supabaseClient){
     try{ await petLoad(); petRealtime(); }catch(e){ console.error('宠物数据加载错误:',e); }
@@ -4256,7 +4264,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange',function(){
     if(!_swReloaded){_swReloaded=true;location.reload();}
   });
-  navigator.serviceWorker.register('/paynews/sw.js?v=24').then(() => {
+  navigator.serviceWorker.register('/paynews/sw.js?v=25').then(() => {
     console.log('[PWA] Service Worker 已注册');
     // 首次安装后请求通知权限
     if ('Notification' in window && Notification.permission === 'default') {
