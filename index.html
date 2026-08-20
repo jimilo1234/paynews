@@ -1238,8 +1238,8 @@ html.light .guest-id.broadcasting { color: #222; }
         <div class="pet-container">
                 <div class="pet-cat-wrap">
         <div id="pet-head-label" class="pet-head-label"></div>
-        <img id="pet-cat" class="pet-cat" alt="像素猫" src="/paynews/pet-assets/cat_work.png?v=23" onerror="this.src='data:image/png;base64,'+_PET_IMG.cat_work;this.onerror=null;" />
-        <img id="pet-mood" class="pet-mood" alt="心情" src="/paynews/pet-assets/mood_calm.png?v=23" onerror="this.src='data:image/png;base64,'+_PET_IMG.mood_calm;this.onerror=null;" />
+        <img id="pet-cat" class="pet-cat" alt="像素猫" src="/paynews/pet-assets/cat_work.png?v=24" onerror="this.src='data:image/png;base64,'+_PET_IMG.cat_work;this.onerror=null;" />
+        <img id="pet-mood" class="pet-mood" alt="心情" src="/paynews/pet-assets/mood_calm.png?v=24" onerror="this.src='data:image/png;base64,'+_PET_IMG.mood_calm;this.onerror=null;" />
       </div>
           <div class="pet-status-text" id="pet-status-text">小猫正在发呆...</div>
           <div class="pet-section">
@@ -1256,12 +1256,30 @@ html.light .guest-id.broadcasting { color: #222; }
               <label class="pet-field"><span>状态</span>
                 <select id="pet-state-select" class="pet-select">
                   <option value="" disabled selected>请选择状态</option>
+                  <option value="work">工作</option>
+                  <option value="study">学习</option>
+                  <option value="eat">吃饭</option>
+                  <option value="exercise">运动</option>
+                  <option value="sleep">睡觉</option>
+                  <option value="listen">听歌</option>
+                  <option value="__other__">其他</option>
                 </select>
                 <input id="pet-state-other" class="pet-other-input" placeholder="请输入状态" maxlength="12" style="display:none" />
               </label>
               <label class="pet-field"><span>心情</span>
                 <select id="pet-mood-select" class="pet-select">
                   <option value="" disabled selected>请选择心情</option>
+                  <option value="calm">发呆</option>
+                  <option value="happy">开心</option>
+                  <option value="sad">难过</option>
+                  <option value="angry">生气</option>
+                  <option value="surprised">惊讶</option>
+                  <option value="sleepy">犯困</option>
+                  <option value="excited">兴奋</option>
+                  <option value="love">恋爱</option>
+                  <option value="cry">哭泣</option>
+                  <option value="daze">放空</option>
+                  <option value="__other__">其他</option>
                 </select>
                 <input id="pet-mood-other" class="pet-other-input" placeholder="请输入心情" maxlength="12" style="display:none" />
               </label>
@@ -3938,11 +3956,11 @@ function render(){
   var moodRef=(petCur&&petCur.mr&&petCur.mr!=='__custom__')?petCur.mr:'calm';
   if(catImg){
     catImg.onerror=function(){this.src='data:image/png;base64,'+_PET_IMG.cat_work;this.onerror=null;};
-    catImg.src='/paynews/pet-assets/cat_'+catRef+'.png?v=23';
+    catImg.src='/paynews/pet-assets/cat_'+catRef+'.png?v=24';
   }
   if(moodImg){
     moodImg.onerror=function(){this.src='data:image/png;base64,'+_PET_IMG.mood_calm;this.onerror=null;};
-    moodImg.src='/paynews/pet-assets/mood_'+moodRef+'.png?v=23';
+    moodImg.src='/paynews/pet-assets/mood_'+moodRef+'.png?v=24';
   }
   window.__petRendered=true;
   window.__petCatLoaded=true;
@@ -4005,14 +4023,6 @@ function initPetSwitch(){
   var apply=document.getElementById('pet-apply-btn');
   var label=document.getElementById('pet-head-label');
   if(!ss||!ms||!apply)return;
-  function fill(sel,meta){
-    // 保留 HTML 中的占位 option，仅追加真实选项
-    meta.forEach(function(it){
-      var o=document.createElement('option');o.value=it.r;o.textContent=it.n;sel.appendChild(o);
-    });
-    var o=document.createElement('option');o.value='__other__';o.textContent='其他';sel.appendChild(o);
-  }
-  fill(ss,STATUS_META);fill(ms,MOOD_META);
   function bindOther(sel,other){
     sel.addEventListener('change',function(){
       other.style.display=(sel.value==='__other__')?'block':'none';
@@ -4246,7 +4256,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange',function(){
     if(!_swReloaded){_swReloaded=true;location.reload();}
   });
-  navigator.serviceWorker.register('/paynews/sw.js?v=23').then(() => {
+  navigator.serviceWorker.register('/paynews/sw.js?v=24').then(() => {
     console.log('[PWA] Service Worker 已注册');
     // 首次安装后请求通知权限
     if ('Notification' in window && Notification.permission === 'default') {
