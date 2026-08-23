@@ -1238,8 +1238,8 @@ html.light .guest-id.broadcasting { color: #222; }
         <div class="pet-container">
                 <div class="pet-cat-wrap">
         <div id="pet-head-label" class="pet-head-label"></div>
-        <img id="pet-cat" class="pet-cat" alt="像素猫" src="/paynews/pet-assets/cat_work.png?v=27" onerror="this.src='data:image/png;base64,'+_PET_IMG.cat_work;this.onerror=null;" />
-        <img id="pet-mood" class="pet-mood" alt="心情" src="/paynews/pet-assets/mood_calm.png?v=27" onerror="this.src='data:image/png;base64,'+_PET_IMG.mood_calm;this.onerror=null;" />
+        <img id="pet-cat" class="pet-cat" alt="像素猫" src="/paynews/pet-assets/cat_work.png?v=28" onerror="this.src='data:image/png;base64,'+_PET_IMG.cat_work;this.onerror=null;" />
+        <img id="pet-mood" class="pet-mood" alt="心情" src="/paynews/pet-assets/mood_calm.png?v=28" onerror="this.src='data:image/png;base64,'+_PET_IMG.mood_calm;this.onerror=null;" />
       </div>
           <div class="pet-status-text" id="pet-status-text">小猫正在发呆...</div>
           <div class="pet-section">
@@ -1763,6 +1763,34 @@ async function fetchMessages() {
   return data || [];
 }
 
+// ===== 工作台首页留言自动刷新（轮询兜底）=====
+let _lastNewsSnap = '';
+let _newsPollId = null;
+// 兜底刷新：轮询 / 切tab 时调用。只靠 Realtime broadcast 容易因频道断开而漏更新。
+async function refreshMemberNews() {
+  if (!currentUser || document.hidden) return;
+  try {
+    const messages = await fetchMessages();
+    const snap = (messages.map(m => m.id || m.created_at)).join(',');
+    if (snap === _lastNewsSnap) return; // 无变化不重渲染，避免打断正在播放的语音
+    _lastNewsSnap = snap;
+    if (messages.length > 0) {
+      const maxId = Math.max(...messages.map(m => m.id));
+      if (maxId > lastPlayedAudioMsgId) lastPlayedAudioMsgId = maxId;
+    }
+    renderNews('member-news-grid', 'member-news-date', messages, true);
+  } catch (e) {
+    console.error('[首页刷新] 失败:', e);
+  }
+}
+function startNewsPolling() {
+  stopNewsPolling();
+  _newsPollId = setInterval(refreshMemberNews, 20000); // 每20秒兜底拉取一次
+}
+function stopNewsPolling() {
+  if (_newsPollId) { clearInterval(_newsPollId); _newsPollId = null; }
+}
+
 // 发送留言（最多保留4条，滚动覆盖最旧的）
 async function sendMessage(username, displayName, text, imageUrl, audioUrl, videoUrl) {
   if (!supabaseClient) throw new Error('Supabase 未初始化');
@@ -1998,6 +2026,8 @@ async function doLogin() {
     document.getElementById('public-page').classList.remove('active');
     document.getElementById('member-page').classList.add('active');
     renderNews('member-news-grid', 'member-news-date', messages);
+    _lastNewsSnap = (messages.map(m => m.id || m.created_at)).join(',');
+    startNewsPolling();
     // 登录后重新初始化对讲机（用正确的用户名作为Presence key）
     initWalkieTalkie();
     // 创建共享的admin-commands channel（所有设备统一使用，防多端登录核心）
@@ -2051,6 +2081,7 @@ function showToast(msg, duration = 3000) {
 function doLogout() {
   // 清除0110限时退出定时器
   if (loginTimeoutId) { clearTimeout(loginTimeoutId); loginTimeoutId = null; }
+  stopNewsPolling(); // 停止首页轮询，避免登出后继续拉取
   
   // 清除服务端session
   if (currentUser && mySessionId) {
@@ -2896,6 +2927,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
       onForumTabActivated();
     } else if (!isPetTab) {
       onForumTabDeactivated();
+      if (targetId === 'tab-news') refreshMemberNews(); // 切回工作台首页时立即拉取最新
     }
   });
 });
@@ -3978,11 +4010,11 @@ function render(){
   var moodRef=(petCur&&petCur.mr&&petCur.mr!=='__custom__')?petCur.mr:'calm';
   if(catImg){
     catImg.onerror=function(){this.src='data:image/png;base64,'+_PET_IMG.cat_work;this.onerror=null;};
-    catImg.src='/paynews/pet-assets/cat_'+catRef+'.png?v=27';
+    catImg.src='/paynews/pet-assets/cat_'+catRef+'.png?v=28';
   }
   if(moodImg){
     moodImg.onerror=function(){this.src='data:image/png;base64,'+_PET_IMG.mood_calm;this.onerror=null;};
-    moodImg.src='/paynews/pet-assets/mood_'+moodRef+'.png?v=27';
+    moodImg.src='/paynews/pet-assets/mood_'+moodRef+'.png?v=28';
   }
   window.__petRendered=true;
   window.__petCatLoaded=true;
@@ -4286,7 +4318,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange',function(){
     if(!_swReloaded){_swReloaded=true;location.reload();}
   });
-  navigator.serviceWorker.register('/paynews/sw.js?v=27').then(() => {
+  navigator.serviceWorker.register('/paynews/sw.js?v=28').then(() => {
     console.log('[PWA] Service Worker 已注册');
     // 首次安装后请求通知权限
     if ('Notification' in window && Notification.permission === 'default') {
