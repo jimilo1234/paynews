@@ -1238,8 +1238,8 @@ html.light .guest-id.broadcasting { color: #222; }
         <div class="pet-container">
                 <div class="pet-cat-wrap">
         <div id="pet-head-label" class="pet-head-label"></div>
-        <img id="pet-cat" class="pet-cat" alt="像素猫" src="/paynews/pet-assets/cat_work.png?v=26" onerror="this.src='data:image/png;base64,'+_PET_IMG.cat_work;this.onerror=null;" />
-        <img id="pet-mood" class="pet-mood" alt="心情" src="/paynews/pet-assets/mood_calm.png?v=26" onerror="this.src='data:image/png;base64,'+_PET_IMG.mood_calm;this.onerror=null;" />
+        <img id="pet-cat" class="pet-cat" alt="像素猫" src="/paynews/pet-assets/cat_work.png?v=27" onerror="this.src='data:image/png;base64,'+_PET_IMG.cat_work;this.onerror=null;" />
+        <img id="pet-mood" class="pet-mood" alt="心情" src="/paynews/pet-assets/mood_calm.png?v=27" onerror="this.src='data:image/png;base64,'+_PET_IMG.mood_calm;this.onerror=null;" />
       </div>
           <div class="pet-status-text" id="pet-status-text">小猫正在发呆...</div>
           <div class="pet-section">
@@ -1699,18 +1699,30 @@ function withTimeout(promise, ms, msg){
 
 async function loginWithSession(username, password, sessionId) {
   if (!supabaseClient) throw new Error('Supabase 未初始化');
-  const { data, error } = await withTimeout(
-    supabaseClient.rpc('login_with_session', {
-      p_username: username,
-      p_password: password,
-      p_session_id: sessionId,
-      p_device_info: navigator.userAgent || ''
-    }),
-    15000,
-    '登录超时，请稍后重试'
-  );
-  if (error) throw error;
-  return data; // [{ display_name, old_session_id, old_login_time }]
+  const opts = {
+    p_username: username,
+    p_password: password,
+    p_session_id: sessionId,
+    p_device_info: navigator.userAgent || ''
+  };
+  let lastErr;
+  // 冷启动应对：首次给足30s唤醒，失败自动重试一次（此时服务已醒，秒回）
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const { data, error } = await withTimeout(
+        supabaseClient.rpc('login_with_session', opts),
+        attempt === 1 ? 30000 : 15000,
+        '登录超时，请稍后重试'
+      );
+      if (error) throw error;
+      return data; // [{ display_name, old_session_id, old_login_time }]
+    } catch (e) {
+      lastErr = e;
+      if (attempt === 1) { await new Promise(r => setTimeout(r, 800)); continue; }
+      throw e;
+    }
+  }
+  throw lastErr;
 }
 
 // 登出时清除session
@@ -1977,7 +1989,7 @@ async function doLogin() {
 
 
     // 加载留言并进入会员页
-    const messages = await withTimeout(fetchMessages(), 15000, '加载消息超时，请稍后重试');
+    const messages = await withTimeout(fetchMessages(), 20000, '加载消息超时，请稍后重试');
     // 初始化lastPlayedAudioMsgId：登录后只自动播放新到达的语音消息，不播放历史
     if (messages.length > 0) {
       lastPlayedAudioMsgId = Math.max(...messages.map(m => m.id));
@@ -3966,11 +3978,11 @@ function render(){
   var moodRef=(petCur&&petCur.mr&&petCur.mr!=='__custom__')?petCur.mr:'calm';
   if(catImg){
     catImg.onerror=function(){this.src='data:image/png;base64,'+_PET_IMG.cat_work;this.onerror=null;};
-    catImg.src='/paynews/pet-assets/cat_'+catRef+'.png?v=26';
+    catImg.src='/paynews/pet-assets/cat_'+catRef+'.png?v=27';
   }
   if(moodImg){
     moodImg.onerror=function(){this.src='data:image/png;base64,'+_PET_IMG.mood_calm;this.onerror=null;};
-    moodImg.src='/paynews/pet-assets/mood_'+moodRef+'.png?v=26';
+    moodImg.src='/paynews/pet-assets/mood_'+moodRef+'.png?v=27';
   }
   window.__petRendered=true;
   window.__petCatLoaded=true;
@@ -4274,7 +4286,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange',function(){
     if(!_swReloaded){_swReloaded=true;location.reload();}
   });
-  navigator.serviceWorker.register('/paynews/sw.js?v=26').then(() => {
+  navigator.serviceWorker.register('/paynews/sw.js?v=27').then(() => {
     console.log('[PWA] Service Worker 已注册');
     // 首次安装后请求通知权限
     if ('Notification' in window && Notification.permission === 'default') {
