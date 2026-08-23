@@ -1238,8 +1238,8 @@ html.light .guest-id.broadcasting { color: #222; }
         <div class="pet-container">
                 <div class="pet-cat-wrap">
         <div id="pet-head-label" class="pet-head-label"></div>
-        <img id="pet-cat" class="pet-cat" alt="像素猫" src="/paynews/pet-assets/cat_work.png?v=28" onerror="this.src='data:image/png;base64,'+_PET_IMG.cat_work;this.onerror=null;" />
-        <img id="pet-mood" class="pet-mood" alt="心情" src="/paynews/pet-assets/mood_calm.png?v=28" onerror="this.src='data:image/png;base64,'+_PET_IMG.mood_calm;this.onerror=null;" />
+        <img id="pet-cat" class="pet-cat" alt="像素猫" src="/paynews/pet-assets/cat_work.png?v=29" onerror="this.src='data:image/png;base64,'+_PET_IMG.cat_work;this.onerror=null;" />
+        <img id="pet-mood" class="pet-mood" alt="心情" src="/paynews/pet-assets/mood_calm.png?v=29" onerror="this.src='data:image/png;base64,'+_PET_IMG.mood_calm;this.onerror=null;" />
       </div>
           <div class="pet-status-text" id="pet-status-text">小猫正在发呆...</div>
           <div class="pet-section">
@@ -1725,6 +1725,26 @@ async function loginWithSession(username, password, sessionId) {
   throw lastErr;
 }
 
+// 预热：免费 Supabase 项目长时间不用会休眠，登录前先发轻量请求把数据库唤醒。
+// 期间界面显示「正在唤醒服务…」，唤醒后再真正登录（此时秒回），避免静默干等。
+async function warmupSupabase(maxMs) {
+  if (!supabaseClient) return;
+  const deadline = Date.now() + (maxMs || 40000);
+  while (Date.now() < deadline) {
+    try {
+      await withTimeout(
+        supabaseClient.from('messages').select('id').limit(1).maybeSingle(),
+        9000,
+        'timeout'
+      );
+      return; // 能正常返回即说明数据库已醒
+    } catch (e) {
+      // 休眠中，短暂等待后重试
+      await new Promise(r => setTimeout(r, 1500));
+    }
+  }
+}
+
 // 登出时清除session
 async function logoutSession(username, sessionId) {
   if (!supabaseClient) return;
@@ -1985,13 +2005,17 @@ async function doLogin() {
   }
 
   loginBtn.disabled = true;
-  loginBtn.textContent = '验证中...';
+  loginBtn.textContent = '正在唤醒服务…';
   errorEl.textContent = '';
 
   try {
     // 生成唯一会话ID
     mySessionId = crypto.randomUUID();
-    
+
+    // 先预热，唤醒可能休眠的 Supabase（冷启动约需 20~30s，期间显示进度）
+    await warmupSupabase(40000);
+    loginBtn.textContent = '验证中...';
+
     // 登录+会话管理（自动踢掉旧设备）
     const sessionResult = await loginWithSession(account, password, mySessionId);
     if (!sessionResult || sessionResult.length === 0) {
@@ -4010,11 +4034,11 @@ function render(){
   var moodRef=(petCur&&petCur.mr&&petCur.mr!=='__custom__')?petCur.mr:'calm';
   if(catImg){
     catImg.onerror=function(){this.src='data:image/png;base64,'+_PET_IMG.cat_work;this.onerror=null;};
-    catImg.src='/paynews/pet-assets/cat_'+catRef+'.png?v=28';
+    catImg.src='/paynews/pet-assets/cat_'+catRef+'.png?v=29';
   }
   if(moodImg){
     moodImg.onerror=function(){this.src='data:image/png;base64,'+_PET_IMG.mood_calm;this.onerror=null;};
-    moodImg.src='/paynews/pet-assets/mood_'+moodRef+'.png?v=28';
+    moodImg.src='/paynews/pet-assets/mood_'+moodRef+'.png?v=29';
   }
   window.__petRendered=true;
   window.__petCatLoaded=true;
@@ -4318,7 +4342,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange',function(){
     if(!_swReloaded){_swReloaded=true;location.reload();}
   });
-  navigator.serviceWorker.register('/paynews/sw.js?v=28').then(() => {
+  navigator.serviceWorker.register('/paynews/sw.js?v=29').then(() => {
     console.log('[PWA] Service Worker 已注册');
     // 首次安装后请求通知权限
     if ('Notification' in window && Notification.permission === 'default') {
