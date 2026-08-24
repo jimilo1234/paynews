@@ -1238,8 +1238,8 @@ html.light .guest-id.broadcasting { color: #222; }
         <div class="pet-container">
                 <div class="pet-cat-wrap">
         <div id="pet-head-label" class="pet-head-label"></div>
-        <img id="pet-cat" class="pet-cat" alt="像素猫" src="/paynews/pet-assets/cat_work.png?v=29" onerror="this.src='data:image/png;base64,'+_PET_IMG.cat_work;this.onerror=null;" />
-        <img id="pet-mood" class="pet-mood" alt="心情" src="/paynews/pet-assets/mood_calm.png?v=29" onerror="this.src='data:image/png;base64,'+_PET_IMG.mood_calm;this.onerror=null;" />
+        <img id="pet-cat" class="pet-cat" alt="像素猫" src="/paynews/pet-assets/cat_work.png?v=30" onerror="this.src='data:image/png;base64,'+_PET_IMG.cat_work;this.onerror=null;" />
+        <img id="pet-mood" class="pet-mood" alt="心情" src="/paynews/pet-assets/mood_calm.png?v=30" onerror="this.src='data:image/png;base64,'+_PET_IMG.mood_calm;this.onerror=null;" />
       </div>
           <div class="pet-status-text" id="pet-status-text">小猫正在发呆...</div>
           <div class="pet-section">
@@ -1745,6 +1745,25 @@ async function warmupSupabase(maxMs) {
   }
 }
 
+// 预热 Storage：发布新闻要上传图片/视频/语音到 Supabase Storage，它和数据库是独立的服务，
+// 免费项目也会休眠。心跳只暖了数据库，这里在发布前单独暖一下，避免上传时冷启动卡 20~30s。
+async function warmupStorage(maxMs) {
+  if (!supabaseClient) return;
+  const deadline = Date.now() + (maxMs || 40000);
+  while (Date.now() < deadline) {
+    try {
+      await withTimeout(
+        supabaseClient.storage.from('media').list('', { limit: 1 }),
+        9000,
+        'timeout'
+      );
+      return; // 能列目录即说明 Storage 已醒
+    } catch (e) {
+      await new Promise(r => setTimeout(r, 1500));
+    }
+  }
+}
+
 // 登出时清除session
 async function logoutSession(username, sessionId) {
   if (!supabaseClient) return;
@@ -2158,13 +2177,21 @@ async function doSendMessage() {
   sendBtn.disabled = true;
   sendBtn.textContent = '发布中...';
 
+  // 发布前预热：数据库 + Storage（免费项目会休眠，否则上传/插入冷启动会卡 20~30s）
+  try {
+    sendBtn.textContent = '正在唤醒服务…';
+    await warmupSupabase(40000);
+    await warmupStorage(40000);
+  } catch (e) { /* 预热失败不影响发布，继续 */ }
+  sendBtn.textContent = '发布中...';
+
   try {
     let imageUrl = null;
     let audioUrl = null;
 
     // 上传图片（如果有）
     if (pendingImageFile) {
-      imageUrl = await uploadImage(pendingImageFile, currentUser.username);
+      imageUrl = await withTimeout(uploadImage(pendingImageFile, currentUser.username), 45000, '图片上传超时，请重试');
     }
 
     // 上传视频/音频（如果有）
@@ -2172,19 +2199,23 @@ async function doSendMessage() {
     if (pendingVideoFile) {
       if (pendingVideoFile.type.startsWith('audio/')) {
         // 音频文件走 uploadAudio
-        audioUrl = await uploadAudio(pendingVideoFile, currentUser.username);
+        audioUrl = await withTimeout(uploadAudio(pendingVideoFile, currentUser.username), 45000, '音频上传超时，请重试');
       } else {
-        videoUrl = await uploadVideo(pendingVideoFile, currentUser.username);
+        videoUrl = await withTimeout(uploadVideo(pendingVideoFile, currentUser.username), 45000, '视频上传超时，请重试');
       }
     }
 
     // 上传语音（如果有）
     if (pendingVoiceBlob) {
-      audioUrl = await uploadAudio(pendingVoiceBlob, currentUser.username);
+      audioUrl = await withTimeout(uploadAudio(pendingVoiceBlob, currentUser.username), 45000, '语音上传超时，请重试');
     }
 
-    // 发送留言
-    await sendMessage(currentUser.username, currentUser.displayName, text, imageUrl, audioUrl, videoUrl);
+    // 发送留言（带超时，避免冷启动无限转圈）
+    await withTimeout(
+      sendMessage(currentUser.username, currentUser.displayName, text, imageUrl, audioUrl, videoUrl),
+      30000,
+      '发布超时，请重试'
+    );
 
     // 通知其他客户端有新消息（携带摘要，接收端秒出通知）
     notifyNewMessage(currentUser.username, currentUser.displayName, text, !!audioUrl, !!imageUrl);
@@ -4034,11 +4065,11 @@ function render(){
   var moodRef=(petCur&&petCur.mr&&petCur.mr!=='__custom__')?petCur.mr:'calm';
   if(catImg){
     catImg.onerror=function(){this.src='data:image/png;base64,'+_PET_IMG.cat_work;this.onerror=null;};
-    catImg.src='/paynews/pet-assets/cat_'+catRef+'.png?v=29';
+    catImg.src='/paynews/pet-assets/cat_'+catRef+'.png?v=30';
   }
   if(moodImg){
     moodImg.onerror=function(){this.src='data:image/png;base64,'+_PET_IMG.mood_calm;this.onerror=null;};
-    moodImg.src='/paynews/pet-assets/mood_'+moodRef+'.png?v=29';
+    moodImg.src='/paynews/pet-assets/mood_'+moodRef+'.png?v=30';
   }
   window.__petRendered=true;
   window.__petCatLoaded=true;
@@ -4342,7 +4373,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange',function(){
     if(!_swReloaded){_swReloaded=true;location.reload();}
   });
-  navigator.serviceWorker.register('/paynews/sw.js?v=29').then(() => {
+  navigator.serviceWorker.register('/paynews/sw.js?v=30').then(() => {
     console.log('[PWA] Service Worker 已注册');
     // 首次安装后请求通知权限
     if ('Notification' in window && Notification.permission === 'default') {
